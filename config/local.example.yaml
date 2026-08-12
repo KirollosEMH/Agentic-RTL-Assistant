@@ -1,0 +1,15 @@
+# Values here override config/default.yaml. Secrets stay in environment variables.
+project:
+  root: descriptive_verilog_design
+
+models:
+  profiles:
+    fast:
+      provider: openai
+      model: replace-with-a-small-model
+    reasoning:
+      provider: openai
+      model: replace-with-a-reasoning-model
+    coding:
+      provider: openai
+      model: replace-with-a-code-capable-model

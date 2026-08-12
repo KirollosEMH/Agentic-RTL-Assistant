@@ -1,0 +1,26 @@
+project:
+  root: descriptive_verilog_design
+
+models:
+  profiles:
+    fast:
+      provider: ollama
+      model: gpt-oss:120b-cloud
+      timeout_seconds: 180
+      retries: 1
+
+    reasoning:
+      provider: ollama
+      model: gpt-oss:120b-cloud
+      timeout_seconds: 300
+      retries: 1
+
+    coding:
+      provider: ollama
+      model: gpt-oss:120b-cloud
+      timeout_seconds: 300
+      retries: 1
+
+  providers:
+    ollama:
+      base_url: http://localhost:11434/v1

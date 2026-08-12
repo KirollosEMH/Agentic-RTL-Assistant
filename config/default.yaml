@@ -1,0 +1,127 @@
+app:
+  name: Agentic RTL Assistant
+  environment: local
+  log_level: INFO
+
+project:
+  root: descriptive_verilog_design
+  verilog_extensions: [.v, .sv]
+  ignored_paths: [.git, .venv, build, runs]
+
+approach:
+  type: multi_agent_graphrag
+
+orchestration:
+  max_steps: 12
+  max_repair_attempts: 2
+  timeout_seconds: 120
+  agents:
+    intent_classifier:
+      enabled: true
+      model: fast
+      temperature: 0.0
+      prompt: prompts/intent_classifier.md
+    rtl_explanation:
+      enabled: true
+      model: reasoning
+      temperature: 0.1
+      prompt: prompts/rtl_explanation.md
+    rtl_codegen:
+      enabled: true
+      model: coding
+      temperature: 0.1
+      prompt: prompts/rtl_codegen.md
+    rtl_repair:
+      enabled: true
+      model: coding
+      temperature: 0.0
+      prompt: prompts/rtl_repair.md
+
+models:
+  profiles:
+    # The fake provider makes the starter project runnable without credentials.
+    # Point these profiles at any configured cloud/local provider for real use.
+    fast: {provider: fake, model: deterministic, timeout_seconds: 30, retries: 0}
+    reasoning: {provider: fake, model: deterministic, timeout_seconds: 60, retries: 0}
+    coding: {provider: fake, model: deterministic, timeout_seconds: 90, retries: 0}
+  providers:
+    fake: {}
+    openai:
+      api_key_env: OPENAI_API_KEY
+    ollama:
+      base_url: http://localhost:11434/v1
+    openrouter:
+      base_url: https://openrouter.ai/api/v1
+      api_key_env: OPENROUTER_API_KEY
+    groq:
+      base_url: https://api.groq.com/openai/v1
+      api_key_env: GROQ_API_KEY
+    cloudflare:
+      api_key_env: CLOUDFLARE_API_TOKEN
+      account_id_env: CLOUDFLARE_ACCOUNT_ID
+
+knowledge:
+  graph:
+    enabled: true
+    backend: memory
+    build_mode: lazy
+    extracted_node_types: [file, module, port, instance]
+    relationship_types: [defines, has_port, has_instance, instantiates, instance_of]
+  graphrag:
+    enabled: true
+    max_hops: 2
+    max_nodes: 24
+    max_source_chunks: 6
+    max_context_tokens: 4000
+    include_graph_facts: true
+    include_source_evidence: true
+  text_rag:
+    enabled: true
+    chunking_strategy: rtl_semantic
+    max_chunks: 6
+    max_chunk_tokens: 1200
+
+rtl:
+  parser_backend: pyverilog
+  validation:
+    parser_check: true
+    compile_check: false
+    simulator: null
+  filesystem:
+    allow_reads: true
+    allow_writes: false
+    require_confirmation_for_write: true
+
+context:
+  max_conversation_messages: 12
+  max_resolved_entities: 24
+  max_evidence_items: 12
+  token_budget:
+    max_request_tokens: 8000
+    max_evidence_tokens: 4000
+
+telemetry:
+  enabled: true
+  track_input_tokens: true
+  track_output_tokens: true
+  track_cached_tokens: true
+  track_timing: true
+  track_tools: true
+  track_agents: true
+  track_retrieval: true
+  persistence_path: runs
+
+evaluation:
+  datasets: [evals/cases/required.yaml]
+  metrics: [correctness, grounding, tokens, latency, validation]
+  repetitions: 1
+  approaches: [direct_llm, text_rag, single_agent, multi_agent_rag, multi_agent_graphrag]
+  model_profiles: [reasoning]
+
+ui:
+  type: textual
+  show_execution_panel: true
+  show_token_panel: true
+  show_metrics_panel: true
+  show_agent_activity: true
+  show_tool_activity: true

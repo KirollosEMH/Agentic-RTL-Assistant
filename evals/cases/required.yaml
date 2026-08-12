@@ -1,0 +1,25 @@
+cases:
+  - id: list_modules
+    type: qa
+    prompt: "What modules are implemented in the project?"
+    expected_entities: [DataPipeline, CounterProducer, DataConsumer]
+
+  - id: explain_pipeline
+    type: qa
+    prompt: "How is DataPipeline related to CounterProducer and DataConsumer?"
+    expected_entities: [DataPipeline, CounterProducer, DataConsumer]
+    expected_relations:
+      - [DataPipeline, INSTANTIATES, CounterProducer]
+      - [DataPipeline, INSTANTIATES, DataConsumer]
+
+  - id: producer_controls
+    type: qa
+    prompt: "What signals control the behavior of CounterProducer?"
+    expected_entities: [CounterProducer, enable, ready_in, rst_n, clk]
+
+  - id: generate_fifo
+    type: code_generation
+    prompt: >
+      Implement a module named FifoBuffer that acts as a buffer
+      between CounterProducer and DataConsumer.
+    expected_module: FifoBuffer
