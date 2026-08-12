@@ -37,9 +37,10 @@ Once `uv` is available, manually activating the environment is optional when usi
 
 ## Configuration
 
-`config/default.yaml` is complete and selects `multi_agent_graphrag`. It uses the deterministic
-`fake` model provider so the starter demo and tests run without API credentials. Copy
-`config/local.example.yaml` and replace its provider/model placeholders for real model use.
+`config/default.yaml` is complete and selects `multi_agent_graphrag`. Its model profiles use
+`gpt-oss:120b-cloud` through the signed-in local Ollama gateway. Run `ollama signin` and
+`ollama pull gpt-oss:120b-cloud` before using the default configuration. Copy
+`config/local.example.yaml` to select different provider/model profiles.
 
 Configuration precedence currently implemented is default YAML, selected YAML, then these
 environment overrides:
@@ -89,10 +90,11 @@ changed, resolves entities, traverses a bounded neighborhood, maps graph entitie
 source ranges, and gives the compact evidence pack to one specialized agent. Generated RTL is
 parser-validated outside the code agent before an optional repair pass.
 
-The model factory normalizes OpenAI, Ollama, OpenRouter, Groq, Cloudflare, and offline fake-provider
-responses into common request/response and token-usage types. OpenAI uses the Responses API; the
-other configured remote/local adapters use their OpenAI-compatible endpoints. Cached input tokens
-remain `null` when a provider does not report them.
+The model factory normalizes OpenAI, Ollama, OpenRouter, Groq, and Cloudflare responses into common
+request/response and token-usage types. OpenAI uses the Responses API; the other configured
+remote/local adapters use their OpenAI-compatible endpoints. Cached input tokens remain `null`
+when a provider does not report them. Credential-free deterministic model doubles exist only under
+`tests/` and are injected through the same provider boundary.
 
 Telemetry events are separate from logs and include request, agent, retrieval, and validation
 activity. The TUI consumes these events, while the evaluation runner consumes the common
@@ -100,11 +102,11 @@ activity. The TUI consumes these events, while the evaluation runner consumes th
 
 ## Current vertical slice
 
-With the default fake provider, the application can discover and parse the three starter modules,
-answer the required module-list/hierarchy/control questions using graph-and-source evidence,
-generate a `FifoBuffer`, validate its syntax/module name, display activity and token usage, and run
-the required evaluation cases. Reads are confined to the configured project root and generated RTL
-is displayed only; it is not written automatically.
+With Ollama signed in and the configured cloud model available, the application can discover and
+parse the three starter modules, answer the required module-list/hierarchy/control questions using
+graph-and-source evidence, generate a `FifoBuffer`, validate its syntax/module name, display
+activity and token usage, and run the required evaluation cases. Reads are confined to the
+configured project root and generated RTL is displayed only; it is not written automatically.
 
 This first phase intentionally leaves full production implementations of tool-calling for A2,
 embedding/vector retrieval, persistent graph backends, compiler/simulator integration, safe

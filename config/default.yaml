@@ -39,13 +39,11 @@ orchestration:
 
 models:
   profiles:
-    # The fake provider makes the starter project runnable without credentials.
-    # Point these profiles at any configured cloud/local provider for real use.
-    fast: {provider: fake, model: deterministic, timeout_seconds: 30, retries: 0}
-    reasoning: {provider: fake, model: deterministic, timeout_seconds: 60, retries: 0}
-    coding: {provider: fake, model: deterministic, timeout_seconds: 90, retries: 0}
+    # Ollama Cloud is reached through the signed-in local Ollama gateway.
+    fast: {provider: ollama, model: gpt-oss:120b-cloud, timeout_seconds: 180, retries: 1}
+    reasoning: {provider: ollama, model: gpt-oss:120b-cloud, timeout_seconds: 300, retries: 1}
+    coding: {provider: ollama, model: gpt-oss:120b-cloud, timeout_seconds: 300, retries: 1}
   providers:
-    fake: {}
     openai:
       api_key_env: OPENAI_API_KEY
     ollama:

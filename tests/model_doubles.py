@@ -1,14 +1,18 @@
-"""Deterministic offline provider used by tests and the starter demo."""
+"""Credential-free model doubles used only by the test suite."""
 
 from __future__ import annotations
 
 import re
 
+from agentic_rtl_assistant.config.models import ModelProfile, ModelsSettings
+from agentic_rtl_assistant.models.base import ModelProvider
 from agentic_rtl_assistant.models.types import ModelRequest, ModelResponse, TokenUsage
 
 
-class FakeModelProvider:
-    name = "fake"
+class StubModelProvider:
+    """Deterministic provider for unit and integration tests."""
+
+    name = "test"
 
     def __init__(self, scripted_responses: list[str] | None = None) -> None:
         self._responses = list(scripted_responses or [])
@@ -54,12 +58,10 @@ module FifoBuffer (
     assign ready_in = !full || ready_out;
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin full <= 1'b0; data_out <= 8'd0; data_out_valid <= 1'b0; end
-        else begin
-            if (ready_in) begin
-                full <= data_valid;
-                data_out_valid <= data_valid;
-                if (data_valid) data_out <= data_in;
-            end
+        else if (ready_in) begin
+            full <= data_valid;
+            data_out_valid <= data_valid;
+            if (data_valid) data_out <= data_in;
         end
     end
 endmodule
@@ -80,3 +82,18 @@ endmodule
                 "when enable and ready_in are both high."
             )
         return "The supplied evidence does not establish a more specific answer."
+
+
+class StubModelProviderFactory:
+    """Factory-compatible injector that always returns the test provider."""
+
+    def __init__(
+        self,
+        settings: ModelsSettings,
+        provider: ModelProvider | None = None,
+    ) -> None:
+        self.settings = settings
+        self.provider = provider or StubModelProvider()
+
+    def create_for_profile(self, profile_name: str) -> tuple[ModelProvider, ModelProfile]:
+        return self.provider, self.settings.profiles[profile_name]

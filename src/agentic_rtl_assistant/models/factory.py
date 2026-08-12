@@ -9,7 +9,6 @@ from agentic_rtl_assistant.config.models import ModelProfile, ModelsSettings, Pr
 from agentic_rtl_assistant.models.base import ModelProvider
 from agentic_rtl_assistant.models.providers import (
     CloudflareProvider,
-    FakeModelProvider,
     GroqProvider,
     OllamaProvider,
     OpenAIProvider,
@@ -42,8 +41,6 @@ class ModelProviderFactory:
 
     def _create(self, profile: ModelProfile, provider: ProviderSettings) -> ModelProvider:
         name = profile.provider
-        if name == "fake":
-            return FakeModelProvider()
         if name == "openai":
             return OpenAIProvider(
                 api_key=self._secret(provider.api_key_env, required=True),
