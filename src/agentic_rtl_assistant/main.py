@@ -25,21 +25,22 @@ def main() -> None:
     args = build_parser().parse_args()
     config_path = Path(getattr(args, "eval_config", None) or args.config)
     config = load_config(config_path)
-    validate_runtime_paths(config)
     if args.command == "eval":
         from agentic_rtl_assistant.evaluation.runner import EvaluationRunner
 
+        validate_runtime_paths(config)
         run_directory = asyncio.run(EvaluationRunner(config).run())
         print(f"Evaluation results: {run_directory}")
         return
-    service = ApplicationService(config)
     if args.ask:
+        validate_runtime_paths(config)
+        service = ApplicationService(config)
         result = asyncio.run(service.ask(args.ask))
         if result.error:
             raise SystemExit(result.error)
         print(result.generated_code or result.answer or "")
         return
-    RTLAssistantTUI(service).run()
+    RTLAssistantTUI(config).run()
 
 
 if __name__ == "__main__":

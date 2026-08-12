@@ -68,6 +68,10 @@ Launch the Textual TUI:
 uv run rtl-assistant --config config/default.yaml
 ```
 
+At startup, paste a project directory into the path field or select one from the directory tree,
+then choose **Open project**. The configured YAML project root is only the initial selection in
+interactive mode.
+
 Run one headless request:
 
 ```bash
