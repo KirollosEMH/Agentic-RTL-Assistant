@@ -7,6 +7,7 @@ import time
 from agentic_rtl_assistant.approaches.base import RunContext, RunResult, UserRequest
 from agentic_rtl_assistant.models.base import ModelProvider
 from agentic_rtl_assistant.models.types import ModelMessage, ModelRequest
+from agentic_rtl_assistant.session.models import as_model_messages
 from agentic_rtl_assistant.telemetry.collector import TelemetryCollector
 from agentic_rtl_assistant.telemetry.timing import TimingMetrics
 from agentic_rtl_assistant.telemetry.traces import EventType, ExecutionTrace
@@ -33,7 +34,6 @@ class DirectLLMApproach:
         self.temperature = temperature
 
     async def run(self, request: UserRequest, context: RunContext) -> RunResult:
-        del context
         started = time.perf_counter()
         start = ExecutionTrace(request.request_id, self.name, EventType.REQUEST_STARTED)
         self.telemetry.record(start)
@@ -42,9 +42,11 @@ class DirectLLMApproach:
                 model=self.model,
                 messages=(
                     ModelMessage("system", self.prompt),
+                    *as_model_messages(context.recent_messages),
                     ModelMessage("user", request.text),
                 ),
                 temperature=self.temperature,
+                metadata=context.model_metadata,
             )
         )
         duration = time.perf_counter() - started

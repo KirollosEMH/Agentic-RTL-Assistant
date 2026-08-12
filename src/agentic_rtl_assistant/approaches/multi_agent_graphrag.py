@@ -33,17 +33,20 @@ class MultiAgentGraphRAGApproach:
         self.model = model
 
     async def run(self, request: UserRequest, context: RunContext) -> RunResult:
-        del context
         started = time.perf_counter()
         start = ExecutionTrace(request.request_id, self.name, EventType.REQUEST_STARTED)
         self.telemetry.record(start)
         initial: AgentState = {
             "request_id": request.request_id,
             "user_request": request.text,
+            "conversation_history": context.recent_messages,
+            "resolved_entities": context.resolved_entities,
             "repair_attempts": 0,
             "usage_events": [],
             "traces": [start],
         }
+        if context.session_id:
+            initial["session_id"] = context.session_id
         try:
             state = await self.workflow.ainvoke(
                 initial, config={"recursion_limit": self.max_steps}

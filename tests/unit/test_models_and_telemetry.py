@@ -3,7 +3,8 @@ from pathlib import Path
 from agentic_rtl_assistant.config import load_config
 from agentic_rtl_assistant.models.factory import ModelProviderFactory
 from agentic_rtl_assistant.models.providers.ollama import OllamaProvider
-from agentic_rtl_assistant.models.types import TokenUsage
+from agentic_rtl_assistant.models.providers.openrouter import OpenRouterProvider
+from agentic_rtl_assistant.models.types import ModelRequest, TokenUsage
 from agentic_rtl_assistant.telemetry.collector import TelemetryCollector
 from agentic_rtl_assistant.telemetry.tokens import aggregate_usage
 from agentic_rtl_assistant.telemetry.traces import EventType, ExecutionTrace
@@ -31,6 +32,19 @@ def test_token_aggregation_preserves_unknown_cached_usage() -> None:
     assert usage.output_tokens == 3
     assert usage.cached_input_tokens is None
     assert usage.llm_calls == 2
+
+
+def test_openrouter_forwards_session_id_for_sticky_routing() -> None:
+    provider = OpenRouterProvider(
+        api_key="test-key", base_url="https://openrouter.ai/api/v1"
+    )
+    request = ModelRequest(
+        model="test/model",
+        messages=(),
+        metadata={"session_id": "session-123"},
+    )
+
+    assert provider._extra_body(request) == {"session_id": "session-123"}
 
 
 def test_telemetry_collects_structured_events() -> None:

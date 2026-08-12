@@ -18,6 +18,11 @@ class StubService:
     def __init__(self, config) -> None:
         self.config = config
         self.telemetry = StubTelemetry()
+        self.created_sessions = 0
+
+    def create_session(self) -> str:
+        self.created_sessions += 1
+        return f"session-{self.created_sessions}"
 
 
 @pytest.mark.asyncio
@@ -43,8 +48,15 @@ async def test_project_is_selected_before_service_creation(
 
         assert app.service is created[0]
         assert app.service.config.project.root == rtl_root.resolve()
+        assert app.session_id == "session-1"
+        assert "session-" in str(app.query_one("#session").render())
         assert app.query_one("#project-setup").has_class("hidden")
         assert not app.query_one("#workspace").has_class("hidden")
+
+        await pilot.click("#new-session")
+        await pilot.pause()
+
+        assert app.session_id == "session-2"
 
         await pilot.click("#choose-project")
         await pilot.pause()

@@ -28,6 +28,8 @@ class RTLAssistantTUI(App[None]):
     #workspace { height: 1fr; }
     #project-header { height: 3; }
     #project { width: 1fr; padding: 1 2; }
+    #session { width: auto; padding: 1 2; color: $text-muted; }
+    #new-session { width: auto; margin-right: 1; }
     #choose-project { width: auto; margin-right: 2; }
     #panels { height: 1fr; }
     #chat { width: 2fr; border: round $accent; }
@@ -44,6 +46,7 @@ class RTLAssistantTUI(App[None]):
         super().__init__()
         self.config = config
         self.service: ApplicationService | None = None
+        self.session_id: str | None = None
         self._service_factory = service_factory
 
     def compose(self) -> ComposeResult:
@@ -58,6 +61,8 @@ class RTLAssistantTUI(App[None]):
         with Vertical(id="workspace", classes="hidden"):
             with Horizontal(id="project-header"):
                 yield Label("Project:", id="project")
+                yield Label("Session: not started", id="session")
+                yield Button("New session", id="new-session")
                 yield Button("Choose project", id="choose-project")
             with Horizontal(id="panels"):
                 yield RichLog(id="chat", wrap=True, markup=True)
@@ -84,6 +89,20 @@ class RTLAssistantTUI(App[None]):
             self._open_project(self.query_one("#project-path", Input).value)
         elif event.button.id == "choose-project":
             self._show_project_setup()
+        elif event.button.id == "new-session":
+            self._start_new_session()
+
+    def _start_new_session(self) -> None:
+        if self.service is None:
+            return
+        self.session_id = self.service.create_session()
+        self.query_one("#session", Label).update(f"Session: {self.session_id[:8]}")
+        self.query_one("#chat", RichLog).clear()
+        self.query_one("#execution", RichLog).clear()
+        self.query_one("#chat", RichLog).write(
+            "[dim]New session started. Conversation context is empty.[/]"
+        )
+        self.query_one("#question", Input).focus()
 
     def _show_project_setup(self) -> None:
         self.query_one("#project-path", Input).value = str(self.config.project.root)
@@ -118,6 +137,7 @@ class RTLAssistantTUI(App[None]):
         self.config = selected_config
         self.service = service
         service.telemetry.subscribe(self._on_trace)
+        self._start_new_session()
         self.query_one("#project", Label).update(f"Project: {project_root}")
         self.query_one("#project-setup", Vertical).add_class("hidden")
         self.query_one("#workspace", Vertical).remove_class("hidden")
@@ -144,7 +164,7 @@ class RTLAssistantTUI(App[None]):
         event.input.disabled = True
         chat = self.query_one("#chat", RichLog)
         chat.write(f"[bold cyan]You:[/] {question}")
-        result = await self.service.ask(question)
+        result = await self.service.ask(question, session_id=self.session_id)
         if result.error:
             chat.write(f"[bold red]Error:[/] {result.error}")
         elif result.generated_code:

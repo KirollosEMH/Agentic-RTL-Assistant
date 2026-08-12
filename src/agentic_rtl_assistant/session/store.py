@@ -7,3 +7,6 @@ class InMemorySessionStore:
 
     def get_or_create(self, session_id: str) -> ConversationState:
         return self._sessions.setdefault(session_id, ConversationState(session_id))
+
+    def clear(self, session_id: str) -> None:
+        self._sessions.pop(session_id, None)

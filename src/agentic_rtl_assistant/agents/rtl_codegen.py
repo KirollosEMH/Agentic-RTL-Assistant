@@ -7,6 +7,7 @@ from agentic_rtl_assistant.agents.types import (
     CodeGenerationOutput,
 )
 from agentic_rtl_assistant.models.types import ModelMessage, ModelRequest
+from agentic_rtl_assistant.session.models import as_model_messages
 
 
 def extract_verilog(content: str) -> str:
@@ -23,6 +24,7 @@ class RTLCodeAgent(Agent[CodeGenerationInput, AgentResult[CodeGenerationOutput]]
                 model=self.profile.model,
                 messages=(
                     ModelMessage("system", self.prompt),
+                    *as_model_messages(context.recent_messages),
                     ModelMessage(
                         "user",
                         f"Requirement:\n{context.requirement}\n\nEvidence:\n{context.evidence.to_prompt()}",
@@ -30,6 +32,7 @@ class RTLCodeAgent(Agent[CodeGenerationInput, AgentResult[CodeGenerationOutput]]
                 ),
                 temperature=self.config.temperature,
                 max_output_tokens=self.profile.max_output_tokens,
+                metadata={"session_id": context.session_id} if context.session_id else {},
             )
         )
         return AgentResult(

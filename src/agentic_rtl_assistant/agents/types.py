@@ -7,6 +7,7 @@ from enum import StrEnum
 
 from agentic_rtl_assistant.knowledge.evidence import EvidencePack
 from agentic_rtl_assistant.models.types import TokenUsage
+from agentic_rtl_assistant.session.models import ConversationMessage
 from agentic_rtl_assistant.telemetry.traces import ExecutionTrace
 
 
@@ -21,6 +22,8 @@ class Intent(StrEnum):
 @dataclass(frozen=True, slots=True)
 class IntentInput:
     user_request: str
+    recent_messages: tuple[ConversationMessage, ...] = ()
+    session_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +35,8 @@ class IntentOutput:
 class ExplanationInput:
     user_request: str
     evidence: EvidencePack
+    recent_messages: tuple[ConversationMessage, ...] = ()
+    session_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +48,8 @@ class ExplanationOutput:
 class CodeGenerationInput:
     requirement: str
     evidence: EvidencePack
+    recent_messages: tuple[ConversationMessage, ...] = ()
+    session_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +63,8 @@ class RepairInput:
     generated_code: str
     validation_errors: tuple[str, ...]
     evidence: EvidencePack
+    recent_messages: tuple[ConversationMessage, ...] = ()
+    session_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -30,6 +30,10 @@ class OpenAICompatibleProvider:
             max_retries=retries,
         )
 
+    def _extra_body(self, request: ModelRequest) -> dict[str, object] | None:
+        del request
+        return None
+
     async def generate(self, request: ModelRequest) -> ModelResponse:
         kwargs: dict[str, object] = {
             "model": request.model,
@@ -41,6 +45,8 @@ class OpenAICompatibleProvider:
         }
         if request.max_output_tokens is not None:
             kwargs["max_tokens"] = request.max_output_tokens
+        if extra_body := self._extra_body(request):
+            kwargs["extra_body"] = extra_body
         try:
             response = await self._client.chat.completions.create(**kwargs)
         except OpenAIError as exc:

@@ -8,6 +8,7 @@ from agentic_rtl_assistant.approaches.base import RunContext, RunResult, UserReq
 from agentic_rtl_assistant.knowledge.rag.text_retriever import TextRetriever
 from agentic_rtl_assistant.models.base import ModelProvider
 from agentic_rtl_assistant.models.types import ModelMessage, ModelRequest
+from agentic_rtl_assistant.session.models import as_model_messages, contextualize_request
 from agentic_rtl_assistant.telemetry.collector import TelemetryCollector
 from agentic_rtl_assistant.telemetry.timing import TimingMetrics
 from agentic_rtl_assistant.telemetry.traces import EventType, ExecutionTrace
@@ -36,12 +37,13 @@ class TextRAGApproach:
         self.temperature = temperature
 
     async def run(self, request: UserRequest, context: RunContext) -> RunResult:
-        del context
         started = time.perf_counter()
         start = ExecutionTrace(request.request_id, self.name, EventType.REQUEST_STARTED)
         self.telemetry.record(start)
         retrieval_started = time.perf_counter()
-        evidence = self.retriever.retrieve(request.text)
+        evidence = self.retriever.retrieve(
+            contextualize_request(request.text, context.recent_messages)
+        )
         retrieval_seconds = time.perf_counter() - retrieval_started
         model_started = time.perf_counter()
         response = await self.provider.generate(
@@ -49,11 +51,13 @@ class TextRAGApproach:
                 model=self.model,
                 messages=(
                     ModelMessage("system", self.prompt),
+                    *as_model_messages(context.recent_messages),
                     ModelMessage(
                         "user", f"Question:\n{request.text}\n\nEvidence:\n{evidence.to_prompt()}"
                     ),
                 ),
                 temperature=self.temperature,
+                metadata=context.model_metadata,
             )
         )
         model_seconds = time.perf_counter() - model_started

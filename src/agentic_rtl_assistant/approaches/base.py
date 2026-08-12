@@ -9,6 +9,7 @@ from uuid import uuid4
 from agentic_rtl_assistant.knowledge.evidence import EvidencePack
 from agentic_rtl_assistant.models.types import TokenUsage
 from agentic_rtl_assistant.rtl.types import ValidationResult
+from agentic_rtl_assistant.session.models import ConversationMessage
 from agentic_rtl_assistant.telemetry.timing import TimingMetrics
 from agentic_rtl_assistant.telemetry.traces import ExecutionTrace
 
@@ -26,6 +27,12 @@ class UserRequest:
 @dataclass(frozen=True, slots=True)
 class RunContext:
     session_id: str | None = None
+    recent_messages: tuple[ConversationMessage, ...] = ()
+    resolved_entities: tuple[str, ...] = ()
+
+    @property
+    def model_metadata(self) -> dict[str, str]:
+        return {"session_id": self.session_id} if self.session_id else {}
 
 
 @dataclass(frozen=True, slots=True)

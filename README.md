@@ -72,6 +72,11 @@ At startup, paste a project directory into the path field or select one from the
 then choose **Open project**. The configured YAML project root is only the initial selection in
 interactive mode.
 
+The TUI keeps a bounded in-memory conversation session for follow-up questions. Use **New
+session** to clear the active conversation context. Opening another project also starts a fresh
+session. The number of retained user/assistant messages is controlled by
+`context.max_conversation_messages`.
+
 Run one headless request:
 
 ```bash

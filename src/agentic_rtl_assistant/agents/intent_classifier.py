@@ -3,6 +3,7 @@ import json
 from agentic_rtl_assistant.agents.base import Agent
 from agentic_rtl_assistant.agents.types import AgentResult, Intent, IntentInput, IntentOutput
 from agentic_rtl_assistant.models.types import ModelMessage, ModelRequest
+from agentic_rtl_assistant.session.models import as_model_messages
 
 
 class IntentClassifierAgent(Agent[IntentInput, AgentResult[IntentOutput]]):
@@ -14,10 +15,12 @@ class IntentClassifierAgent(Agent[IntentInput, AgentResult[IntentOutput]]):
                 model=self.profile.model,
                 messages=(
                     ModelMessage("system", self.prompt),
+                    *as_model_messages(context.recent_messages),
                     ModelMessage("user", context.user_request),
                 ),
                 temperature=self.config.temperature,
                 max_output_tokens=self.profile.max_output_tokens,
+                metadata={"session_id": context.session_id} if context.session_id else {},
             )
         )
         try:

@@ -21,6 +21,7 @@ from agentic_rtl_assistant.agents.types import (
 from agentic_rtl_assistant.knowledge.evidence import EvidencePack
 from agentic_rtl_assistant.orchestration.state import AgentState
 from agentic_rtl_assistant.rtl.validator import RTLValidator
+from agentic_rtl_assistant.session.models import contextualize_request
 from agentic_rtl_assistant.telemetry.collector import TelemetryCollector
 from agentic_rtl_assistant.telemetry.traces import EventType, ExecutionTrace
 
@@ -73,7 +74,13 @@ class WorkflowNodes:
     async def classify_intent(self, state: AgentState) -> dict[str, object]:
         started = time.perf_counter()
         start = self._trace(state, self.intent_agent.name, EventType.AGENT_STARTED)
-        result = await self.intent_agent.execute(IntentInput(state["user_request"]))
+        result = await self.intent_agent.execute(
+            IntentInput(
+                state["user_request"],
+                state.get("conversation_history", ()),
+                state.get("session_id"),
+            )
+        )
         end = self._trace(
             state,
             self.intent_agent.name,
@@ -102,7 +109,15 @@ class WorkflowNodes:
 
     def source_retrieve(self, state: AgentState) -> dict[str, object]:
         started = time.perf_counter()
-        evidence = self.retrieval.retrieve(state["user_request"])
+        retrieval_request = contextualize_request(
+            state["user_request"], state.get("conversation_history", ())
+        )
+        resolved_entities = state.get("resolved_entities", ())
+        if resolved_entities:
+            retrieval_request += "\n\nPreviously resolved RTL entities:\n" + ", ".join(
+                resolved_entities
+            )
+        evidence = self.retrieval.retrieve(retrieval_request)
         trace = self._trace(
             state,
             "evidence_retrieval",
@@ -120,7 +135,12 @@ class WorkflowNodes:
         started = time.perf_counter()
         start = self._trace(state, self.explanation_agent.name, EventType.AGENT_STARTED)
         result = await self.explanation_agent.execute(
-            ExplanationInput(state["user_request"], state.get("evidence", EvidencePack()))
+            ExplanationInput(
+                state["user_request"],
+                state.get("evidence", EvidencePack()),
+                state.get("conversation_history", ()),
+                state.get("session_id"),
+            )
         )
         end = self._trace(
             state,
@@ -138,7 +158,12 @@ class WorkflowNodes:
         started = time.perf_counter()
         start = self._trace(state, self.code_agent.name, EventType.AGENT_STARTED)
         result = await self.code_agent.execute(
-            CodeGenerationInput(state["user_request"], state.get("evidence", EvidencePack()))
+            CodeGenerationInput(
+                state["user_request"],
+                state.get("evidence", EvidencePack()),
+                state.get("conversation_history", ()),
+                state.get("session_id"),
+            )
         )
         end = self._trace(
             state,
@@ -179,6 +204,8 @@ class WorkflowNodes:
                 generated_code=state.get("generated_code", ""),
                 validation_errors=validation.errors,
                 evidence=state.get("evidence", EvidencePack()),
+                recent_messages=state.get("conversation_history", ()),
+                session_id=state.get("session_id"),
             )
         )
         attempts = state.get("repair_attempts", 0) + 1
