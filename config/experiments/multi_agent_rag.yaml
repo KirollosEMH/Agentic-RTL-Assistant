@@ -1,2 +1,5 @@
 approach:
   type: multi_agent_rag
+
+evaluation:
+  approaches: [multi_agent_rag]

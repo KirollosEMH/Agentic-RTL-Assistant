@@ -1,2 +1,5 @@
 approach:
   type: single_agent
+
+evaluation:
+  approaches: [single_agent]

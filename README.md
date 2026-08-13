@@ -54,9 +54,9 @@ shell (or load a local `.env` by your own environment tooling).
 
 The files in `config/experiments/` override only the architecture family:
 
-- A0 `direct_llm`
+- A0 `direct_llm` (one call with every project RTL file in the prompt)
 - A1 `text_rag`
-- A2 `single_agent`
+- A2 `single_agent` (one agent with bounded read-only source tools)
 - A3 `multi_agent_rag`
 - A4 `multi_agent_graphrag` (primary)
 
@@ -89,6 +89,23 @@ results under `runs/`:
 ```bash
 uv run rtl-assistant eval --config config/experiments/multi_agent_graphrag.yaml
 ```
+
+Run the full approach/model matrix across the configured Ollama and OpenRouter models:
+
+```bash
+uv run --env-file .env rtl-assistant eval --config config/eval-matrix.yaml
+```
+
+The runner evaluates the cross product of `evaluation.approaches` and
+`evaluation.model_profiles`. Each named model profile represents one provider/model pair and is
+assigned to every agent role for that matrix cell, making comparisons consistent. Add another
+model by defining another entry under `models.profiles` and including its name in
+`evaluation.model_profiles`.
+
+The matrix creates a parent run under `runs/matrix/` with aggregate `results.json`,
+`metrics.json`, and `traces.jsonl`. The `combinations/` directory contains separate resolved
+configuration and artifacts for every approach/model pairing. A failed request is recorded without
+aborting the remaining combinations.
 
 Evaluation cases can label `expected_source_paths`, `expected_entities`, and
 `expected_relations`. When `retrieval` is enabled in `evaluation.metrics`, `results.json` contains
@@ -123,10 +140,11 @@ graph-and-source evidence, generate a `FifoBuffer`, validate its syntax/module n
 activity and token usage, and run the required evaluation cases. Reads are confined to the
 configured project root and generated RTL is displayed only; it is not written automatically.
 
-This first phase intentionally leaves full production implementations of tool-calling for A2,
-embedding/vector retrieval, persistent graph backends, compiler/simulator integration, safe
-confirmed writes, rich conversation summarization, provider-specific advanced options, and
-statistical/behavioral evaluators for later work.
+The A2 tool loop uses a provider-independent JSON protocol so it works through OpenAI, Ollama,
+OpenRouter, Groq, and Cloudflare without provider-specific tool-call payloads. This first phase
+intentionally leaves embedding/vector retrieval, persistent graph backends, compiler/simulator
+integration, safe confirmed writes, rich conversation summarization, provider-specific advanced
+options, and statistical/behavioral evaluators for later work.
 
 ## Quality checks
 

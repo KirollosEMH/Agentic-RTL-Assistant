@@ -1,2 +1,5 @@
 approach:
   type: text_rag
+
+evaluation:
+  approaches: [text_rag]

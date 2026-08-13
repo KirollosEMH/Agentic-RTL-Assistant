@@ -1,0 +1,50 @@
+# Cross-product evaluation: every approach is run with every named model profile below.
+# The Ollama models must appear in `ollama list`; OpenRouter credentials come from .env.
+models:
+  profiles:
+    ollama_gpt_oss_120b:
+      provider: ollama
+      model: gpt-oss:120b-cloud
+      timeout_seconds: 300
+      retries: 1
+
+    ollama_kimi_k2_6:
+      provider: ollama
+      model: nemotron-3-super:cloud
+      timeout_seconds: 300
+      retries: 1
+
+    openrouter_nemotron_3_ultra:
+      provider: openrouter
+      model: nvidia/nemotron-3-ultra-550b-a55b:free
+      timeout_seconds: 300
+      retries: 1
+
+    openrouter_gemma_4:
+      provider: openrouter
+      model: google/gemma-4-31b-it:free
+      timeout_seconds: 300
+      retries: 1
+
+  providers:
+    ollama:
+      base_url: http://localhost:11434/v1
+    openrouter:
+      base_url: https://openrouter.ai/api/v1
+      api_key_env: OPENROUTER_API_KEY
+
+evaluation:
+  approaches:
+    - direct_llm
+    - text_rag
+    - single_agent
+    - multi_agent_rag
+    - multi_agent_graphrag
+  model_profiles:
+    - ollama_gpt_oss_120b
+    - ollama_kimi_k2_6
+    - openrouter_nemotron_3_ultra
+    - openrouter_gemma_4
+
+telemetry:
+  persistence_path: runs/matrix

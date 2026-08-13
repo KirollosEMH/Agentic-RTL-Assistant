@@ -64,11 +64,11 @@ class ApproachFactory:
     def create(self, approach_type: ApproachType | None = None) -> AssistantApproach:
         selected = approach_type or self.config.approach.type
         if selected is ApproachType.DIRECT_LLM:
-            return self._direct(DirectLLMApproach)
+            return self._direct()
         if selected is ApproachType.TEXT_RAG:
             return self._text_rag()
         if selected is ApproachType.SINGLE_AGENT:
-            return self._direct(SingleAgentApproach)
+            return self._single_agent()
         if selected is ApproachType.MULTI_AGENT_RAG:
             return self._multi_agent(graphrag=False)
         if selected is ApproachType.MULTI_AGENT_GRAPHRAG:
@@ -81,16 +81,35 @@ class ApproachFactory:
         except KeyError as exc:
             raise ValueError(f"missing required agent configuration: {name}") from exc
 
-    def _direct(self, approach_class):
+    def _direct(self) -> DirectLLMApproach:
         agent = self._agent_config("rtl_explanation")
         provider, profile = self.model_factory.create_for_profile(agent.model)
-        return approach_class(
+        return DirectLLMApproach(
             provider,
+            model=profile.model,
+            provider_name=profile.provider,
+            prompt=Path(agent.prompt).read_text(encoding="utf-8"),
+            repository=self.repository,
+            telemetry=self.telemetry,
+            temperature=agent.temperature,
+            max_output_tokens=profile.max_output_tokens,
+        )
+
+    def _single_agent(self) -> SingleAgentApproach:
+        agent = self._agent_config("single_agent")
+        provider, profile = self.model_factory.create_for_profile(agent.model)
+        return SingleAgentApproach(
+            provider,
+            self.repository,
             model=profile.model,
             provider_name=profile.provider,
             prompt=Path(agent.prompt).read_text(encoding="utf-8"),
             telemetry=self.telemetry,
             temperature=agent.temperature,
+            max_steps=self.config.orchestration.max_steps,
+            max_evidence_items=self.config.context.max_evidence_items,
+            max_evidence_tokens=self.config.context.token_budget.max_evidence_tokens,
+            max_output_tokens=profile.max_output_tokens,
         )
 
     def _text_retriever(self) -> TextRetriever:

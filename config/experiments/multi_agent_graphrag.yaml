@@ -1,2 +1,5 @@
 approach:
   type: multi_agent_graphrag
+
+evaluation:
+  approaches: [multi_agent_graphrag]

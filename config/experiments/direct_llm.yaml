@@ -1,2 +1,5 @@
 approach:
   type: direct_llm
+
+evaluation:
+  approaches: [direct_llm]

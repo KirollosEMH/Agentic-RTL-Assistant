@@ -21,6 +21,11 @@ orchestration:
       model: fast
       temperature: 0.0
       prompt: prompts/intent_classifier.md
+    single_agent:
+      enabled: true
+      model: reasoning
+      temperature: 0.0
+      prompt: prompts/single_agent.md
     rtl_explanation:
       enabled: true
       model: reasoning
