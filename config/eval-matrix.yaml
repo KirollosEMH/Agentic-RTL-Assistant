@@ -8,7 +8,7 @@ models:
       timeout_seconds: 300
       retries: 1
 
-    ollama_kimi_k2_6:
+    ollama_nemotron_3_super:
       provider: ollama
       model: nemotron-3-super:cloud
       timeout_seconds: 300
@@ -42,7 +42,7 @@ evaluation:
     - multi_agent_graphrag
   model_profiles:
     - ollama_gpt_oss_120b
-    - ollama_kimi_k2_6
+    - ollama_nemotron_3_super
     - openrouter_nemotron_3_ultra
     - openrouter_gemma_4
 

@@ -4,23 +4,26 @@ project:
 models:
   profiles:
     fast:
-      provider: ollama
-      model: gpt-oss:120b-cloud
+      provider: openrouter
+      model: nvidia/nemotron-3-ultra-550b-a55b:free
       timeout_seconds: 180
       retries: 1
 
     reasoning:
-      provider: ollama
-      model: gpt-oss:120b-cloud
+      provider: openrouter
+      model: nvidia/nemotron-3-ultra-550b-a55b:free
       timeout_seconds: 300
       retries: 1
 
     coding:
-      provider: ollama
-      model: gpt-oss:120b-cloud
+      provider: openrouter
+      model: nvidia/nemotron-3-ultra-550b-a55b:free
       timeout_seconds: 300
       retries: 1
 
   providers:
-    ollama:
-      base_url: http://localhost:11434/v1
+    # ollama:
+    #   base_url: http://localhost:11434/v1
+    openrouter:
+      base_url: https://openrouter.ai/api/v1
+      api_key_env: OPENROUTER_API_KEY

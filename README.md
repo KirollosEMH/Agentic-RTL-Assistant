@@ -39,8 +39,8 @@ Once `uv` is available, manually activating the environment is optional when usi
 
 `config/default.yaml` is complete and selects `multi_agent_graphrag`. Its model profiles use
 `gpt-oss:120b-cloud` through the signed-in local Ollama gateway. Run `ollama signin` and
-`ollama pull gpt-oss:120b-cloud` before using the default configuration. Copy
-`config/local.example.yaml` to select different provider/model profiles.
+`ollama pull gpt-oss:120b-cloud` before using the default configuration. Use `config/local.yaml`
+to select different provider/model profiles.
 
 Configuration precedence currently implemented is default YAML, selected YAML, then these
 environment overrides:
