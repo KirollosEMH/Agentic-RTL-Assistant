@@ -90,6 +90,12 @@ results under `runs/`:
 uv run rtl-assistant eval --config config/experiments/multi_agent_graphrag.yaml
 ```
 
+Evaluation cases can label `expected_source_paths`, `expected_entities`, and
+`expected_relations`. When `retrieval` is enabled in `evaluation.metrics`, `results.json` contains
+per-case source precision/recall/F1, hit rate, MRR, entity recall, relation recall, and a macro
+retrieval-accuracy score. `metrics.json` contains the corresponding averages across evaluated
+requests.
+
 ## Architecture
 
 The YAML loader produces a validated `AppConfig`; factories then inject model providers and

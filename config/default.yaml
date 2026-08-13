@@ -111,7 +111,7 @@ telemetry:
 
 evaluation:
   datasets: [evals/cases/required.yaml]
-  metrics: [correctness, grounding, tokens, latency, validation]
+  metrics: [correctness, grounding, retrieval, tokens, latency, validation]
   repetitions: 1
   approaches: [direct_llm, text_rag, single_agent, multi_agent_rag, multi_agent_graphrag]
   model_profiles: [reasoning]
