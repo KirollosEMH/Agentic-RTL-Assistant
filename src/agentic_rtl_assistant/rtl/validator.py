@@ -1,5 +1,3 @@
-"""Deterministic validation abstraction with an initial parser layer."""
-
 from agentic_rtl_assistant.rtl.parser import RTLParseError, RTLParser
 from agentic_rtl_assistant.rtl.types import ValidationResult
 

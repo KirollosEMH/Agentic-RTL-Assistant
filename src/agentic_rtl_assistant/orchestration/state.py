@@ -1,5 +1,3 @@
-"""Typed per-request LangGraph state, separate from sessions and application state."""
-
 from __future__ import annotations
 
 import operator

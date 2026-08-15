@@ -1,5 +1,3 @@
-"""Evaluation runner kept outside the production request graph."""
-
 from __future__ import annotations
 
 import hashlib

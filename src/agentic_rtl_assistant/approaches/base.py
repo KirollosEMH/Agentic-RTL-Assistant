@@ -1,5 +1,3 @@
-"""Common request/result contract shared by all architecture families."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

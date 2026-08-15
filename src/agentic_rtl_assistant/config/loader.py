@@ -1,5 +1,3 @@
-"""YAML loading with deterministic precedence and typed validation."""
-
 from __future__ import annotations
 
 import os

@@ -1,5 +1,3 @@
-"""A2: one model agent with bounded, read-only RTL source tools."""
-
 from __future__ import annotations
 
 import json

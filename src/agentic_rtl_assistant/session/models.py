@@ -1,5 +1,3 @@
-"""Conversation state is deliberately separate from per-request graph state."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field

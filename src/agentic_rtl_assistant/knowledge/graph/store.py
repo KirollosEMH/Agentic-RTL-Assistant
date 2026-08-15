@@ -1,5 +1,3 @@
-"""Graph storage interface and initial in-memory backend."""
-
 from __future__ import annotations
 
 from typing import Protocol

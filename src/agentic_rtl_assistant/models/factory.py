@@ -1,5 +1,3 @@
-"""Model provider factory: the only provider-selection branch in the application."""
-
 from __future__ import annotations
 
 import os
@@ -8,7 +6,6 @@ from collections.abc import Mapping
 from agentic_rtl_assistant.config.models import ModelProfile, ModelsSettings, ProviderSettings
 from agentic_rtl_assistant.models.base import ModelProvider
 from agentic_rtl_assistant.models.providers import (
-    CloudflareProvider,
     GroqProvider,
     OllamaProvider,
     OpenAIProvider,
@@ -53,16 +50,12 @@ class ModelProviderFactory:
             "ollama": OllamaProvider,
             "openrouter": OpenRouterProvider,
             "groq": GroqProvider,
-            "cloudflare": CloudflareProvider,
         }
         try:
             provider_class = classes[name]
         except KeyError as exc:
             raise ValueError(f"unsupported model provider: {name}") from exc
         base_url = provider.base_url
-        if name == "cloudflare" and not base_url:
-            account_id = self._secret(provider.account_id_env, required=True)
-            base_url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1"
         if not base_url:
             raise ValueError(f"provider {name} requires a base_url")
         api_key = self._secret(provider.api_key_env, required=name != "ollama") or "ollama"

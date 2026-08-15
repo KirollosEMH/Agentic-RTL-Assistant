@@ -1,5 +1,3 @@
-"""LangGraph nodes; retrieval and validation remain deterministic services."""
-
 from __future__ import annotations
 
 import re

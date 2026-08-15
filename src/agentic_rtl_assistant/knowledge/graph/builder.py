@@ -1,5 +1,3 @@
-"""Deterministic structural graph construction from compact parser output."""
-
 from agentic_rtl_assistant.knowledge.graph.model import (
     GraphEdge,
     GraphNode,

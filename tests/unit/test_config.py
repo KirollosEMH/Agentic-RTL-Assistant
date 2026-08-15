@@ -41,3 +41,20 @@ def test_agent_model_profile_must_exist(repository_root: Path, tmp_path: Path) -
             default_path=repository_root / "config" / "default.yaml",
             environment={},
         )
+
+
+def test_removed_cloudflare_provider_is_rejected(
+    repository_root: Path, tmp_path: Path
+) -> None:
+    override = tmp_path / "cloudflare.yaml"
+    override.write_text(
+        "models:\n  profiles:\n    reasoning:\n      provider: cloudflare\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="openai.*ollama.*openrouter.*groq"):
+        load_config(
+            override,
+            default_path=repository_root / "config" / "default.yaml",
+            environment={},
+        )

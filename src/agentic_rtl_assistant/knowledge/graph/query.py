@@ -1,5 +1,3 @@
-"""Entity resolution and bounded neighborhood expansion."""
-
 from __future__ import annotations
 
 import re

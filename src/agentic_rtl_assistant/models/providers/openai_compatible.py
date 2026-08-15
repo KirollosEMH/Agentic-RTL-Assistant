@@ -1,5 +1,3 @@
-"""Adapter for providers exposing OpenAI-compatible chat completions."""
-
 from __future__ import annotations
 
 from openai import AsyncOpenAI, OpenAIError

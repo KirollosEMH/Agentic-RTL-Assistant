@@ -1,5 +1,3 @@
-"""Token aggregation preserving unknown cached-token values."""
-
 from collections.abc import Iterable
 
 from agentic_rtl_assistant.models.types import TokenUsage

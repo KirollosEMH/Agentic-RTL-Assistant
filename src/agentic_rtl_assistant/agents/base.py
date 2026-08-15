@@ -1,5 +1,3 @@
-"""Custom agent abstraction; no prebuilt agent loop is used."""
-
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

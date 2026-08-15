@@ -1,5 +1,3 @@
-"""PyVerilog adapter producing compact structural facts, never raw AST dumps."""
-
 from __future__ import annotations
 
 import hashlib

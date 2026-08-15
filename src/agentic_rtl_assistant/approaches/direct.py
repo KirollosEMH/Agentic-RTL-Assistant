@@ -1,5 +1,3 @@
-"""A0: one model call with the complete project RTL source."""
-
 from __future__ import annotations
 
 import time

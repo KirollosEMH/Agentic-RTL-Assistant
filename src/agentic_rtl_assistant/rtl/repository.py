@@ -1,5 +1,3 @@
-"""Project-root-confined source access."""
-
 from __future__ import annotations
 
 import hashlib

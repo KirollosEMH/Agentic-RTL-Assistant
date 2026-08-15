@@ -121,7 +121,7 @@ changed, resolves entities, traverses a bounded neighborhood, maps graph entitie
 source ranges, and gives the compact evidence pack to one specialized agent. Generated RTL is
 parser-validated outside the code agent before an optional repair pass.
 
-The model factory normalizes OpenAI, Ollama, OpenRouter, Groq, and Cloudflare responses into common
+The model factory normalizes OpenAI, Ollama, OpenRouter, and Groq responses into common
 request/response and token-usage types. OpenAI uses the Responses API; the other configured
 remote/local adapters use their OpenAI-compatible endpoints. Cached input tokens remain `null`
 when a provider does not report them. Credential-free deterministic model doubles exist only under
@@ -140,7 +140,7 @@ activity and token usage, and run the required evaluation cases. Reads are confi
 configured project root and generated RTL is displayed only; it is not written automatically.
 
 The A2 tool loop uses a provider-independent JSON protocol so it works through OpenAI, Ollama,
-OpenRouter, Groq, and Cloudflare without provider-specific tool-call payloads. This first phase
+OpenRouter, and Groq without provider-specific tool-call payloads. This first phase
 intentionally leaves embedding/vector retrieval, persistent graph backends, compiler/simulator
 integration, safe confirmed writes, rich conversation summarization, provider-specific advanced
 options, and statistical/behavioral evaluators for later work.

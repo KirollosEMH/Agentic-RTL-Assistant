@@ -1,5 +1,3 @@
-"""Composition root for interchangeable assistant approaches."""
-
 from __future__ import annotations
 
 from pathlib import Path

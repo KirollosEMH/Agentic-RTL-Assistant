@@ -1,5 +1,3 @@
-"""Lexical baseline over RTL-semantic chunks."""
-
 from __future__ import annotations
 
 import re

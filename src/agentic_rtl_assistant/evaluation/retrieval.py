@@ -1,5 +1,3 @@
-"""Deterministic retrieval metrics computed against dataset ground truth."""
-
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass

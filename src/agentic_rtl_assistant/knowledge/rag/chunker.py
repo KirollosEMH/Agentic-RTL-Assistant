@@ -1,5 +1,3 @@
-"""RTL-aware semantic source chunking."""
-
 from dataclasses import dataclass
 
 from agentic_rtl_assistant.rtl.repository import RTLRepository

@@ -49,9 +49,6 @@ models:
     groq:
       base_url: https://api.groq.com/openai/v1
       api_key_env: GROQ_API_KEY
-    cloudflare:
-      api_key_env: CLOUDFLARE_API_TOKEN
-      account_id_env: CLOUDFLARE_ACCOUNT_ID
 
 knowledge:
   graph:

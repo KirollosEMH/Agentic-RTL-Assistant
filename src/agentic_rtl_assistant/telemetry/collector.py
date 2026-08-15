@@ -1,5 +1,3 @@
-"""In-process event collector, independent of logging and UI."""
-
 from __future__ import annotations
 
 from collections.abc import Callable

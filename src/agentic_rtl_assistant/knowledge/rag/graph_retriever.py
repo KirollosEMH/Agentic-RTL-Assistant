@@ -1,5 +1,3 @@
-"""GraphRAG: graph traversal followed by exact source-range retrieval."""
-
 from __future__ import annotations
 
 import time

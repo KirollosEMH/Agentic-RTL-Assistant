@@ -1,5 +1,3 @@
-"""Primary bounded LangGraph workflow builder."""
-
 from langgraph.graph import END, START, StateGraph
 
 from agentic_rtl_assistant.orchestration.nodes import WorkflowNodes

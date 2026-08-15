@@ -1,5 +1,3 @@
-"""A1: direct model plus deterministic RTL-aware text retrieval."""
-
 from __future__ import annotations
 
 import time

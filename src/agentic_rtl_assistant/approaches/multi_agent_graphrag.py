@@ -1,5 +1,3 @@
-"""A4 primary approach backed by the custom-agent LangGraph workflow."""
-
 from __future__ import annotations
 
 import time

@@ -1,5 +1,3 @@
-"""Derived-index lifecycle; source files remain authoritative."""
-
 from __future__ import annotations
 
 from agentic_rtl_assistant.knowledge.evidence import EvidencePack

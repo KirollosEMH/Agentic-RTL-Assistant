@@ -1,5 +1,3 @@
-"""Startup validation beyond Pydantic's cross-field checks."""
-
 from pathlib import Path
 
 from agentic_rtl_assistant.config.models import AppConfig

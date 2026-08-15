@@ -1,5 +1,3 @@
-"""Typed application configuration."""
-
 from __future__ import annotations
 
 from enum import StrEnum
@@ -47,7 +45,7 @@ class OrchestrationSettings(StrictModel):
 
 
 class ModelProfile(StrictModel):
-    provider: str
+    provider: Literal["openai", "ollama", "openrouter", "groq"]
     model: str
     timeout_seconds: float = Field(default=60, gt=0)
     retries: int = Field(default=1, ge=0)
@@ -57,7 +55,6 @@ class ModelProfile(StrictModel):
 class ProviderSettings(StrictModel):
     base_url: str | None = None
     api_key_env: str | None = None
-    account_id_env: str | None = None
 
 
 class ModelsSettings(StrictModel):
