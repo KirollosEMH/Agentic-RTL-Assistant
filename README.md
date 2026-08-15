@@ -47,7 +47,6 @@ environment overrides:
 
 - `RTL_ASSISTANT_PROJECT_ROOT`
 - `RTL_ASSISTANT_APPROACH`
-- `RTL_ASSISTANT_LOG_LEVEL`
 
 Provider credentials are named in `.env.example` but are never stored in YAML. Export them in the
 shell (or load a local `.env` by your own environment tooling).

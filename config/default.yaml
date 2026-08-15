@@ -1,8 +1,3 @@
-app:
-  name: Agentic RTL Assistant
-  environment: local
-  log_level: INFO
-
 project:
   root: descriptive_verilog_design
   verilog_extensions: [.v, .sv]
@@ -88,8 +83,6 @@ rtl:
   parser_backend: pyverilog
   validation:
     parser_check: true
-    compile_check: false
-    simulator: null
   filesystem:
     allow_reads: true
     allow_writes: false
@@ -105,13 +98,6 @@ context:
 
 telemetry:
   enabled: true
-  track_input_tokens: true
-  track_output_tokens: true
-  track_cached_tokens: true
-  track_timing: true
-  track_tools: true
-  track_agents: true
-  track_retrieval: true
   persistence_path: runs
 
 evaluation:

@@ -23,12 +23,6 @@ class ApproachType(StrEnum):
     MULTI_AGENT_GRAPHRAG = "multi_agent_graphrag"
 
 
-class AppSettings(StrictModel):
-    name: str = "Agentic RTL Assistant"
-    environment: str = "local"
-    log_level: str = "INFO"
-
-
 class ProjectSettings(StrictModel):
     root: Path
     verilog_extensions: list[str] = Field(default_factory=lambda: [".v", ".sv"])
@@ -105,8 +99,6 @@ class KnowledgeSettings(StrictModel):
 
 class ValidationSettings(StrictModel):
     parser_check: bool = True
-    compile_check: bool = False
-    simulator: str | None = None
 
 
 class FilesystemSettings(StrictModel):
@@ -135,13 +127,6 @@ class ContextSettings(StrictModel):
 
 class TelemetrySettings(StrictModel):
     enabled: bool = True
-    track_input_tokens: bool = True
-    track_output_tokens: bool = True
-    track_cached_tokens: bool = True
-    track_timing: bool = True
-    track_tools: bool = True
-    track_agents: bool = True
-    track_retrieval: bool = True
     persistence_path: Path = Path("runs")
 
 
@@ -163,7 +148,6 @@ class UISettings(StrictModel):
 
 
 class AppConfig(StrictModel):
-    app: AppSettings
     project: ProjectSettings
     approach: ApproachSettings
     orchestration: OrchestrationSettings

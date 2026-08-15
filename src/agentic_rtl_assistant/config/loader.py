@@ -44,8 +44,6 @@ def _environment_overrides(environment: Mapping[str, str]) -> dict[str, Any]:
         overrides.setdefault("project", {})["root"] = root
     if approach := environment.get("RTL_ASSISTANT_APPROACH"):
         overrides.setdefault("approach", {})["type"] = approach
-    if log_level := environment.get("RTL_ASSISTANT_LOG_LEVEL"):
-        overrides.setdefault("app", {})["log_level"] = log_level
     return overrides
 
 
