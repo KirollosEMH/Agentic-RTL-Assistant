@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import pytest
+from openai import AsyncOpenAI
+
 from agentic_rtl_assistant.config import load_config
 from agentic_rtl_assistant.models.factory import ModelProviderFactory
 from agentic_rtl_assistant.models.providers.ollama import OllamaProvider
@@ -14,10 +17,22 @@ def test_provider_factory_builds_configured_ollama_provider(repository_root: Pat
     config_path = repository_root / "config" / "default.yaml"
     config = load_config(config_path, default_path=config_path, environment={})
 
-    provider, profile = ModelProviderFactory(config.models, {}).create_for_profile("fast")
+    provider, profile = ModelProviderFactory(
+        config.models, {"OLLAMA_API_KEY": "test-key"}
+    ).create_for_profile("fast")
 
     assert isinstance(provider, OllamaProvider)
-    assert profile.model == "gpt-oss:120b-cloud"
+    assert isinstance(provider._client, AsyncOpenAI)
+    assert str(provider._client.base_url) == "https://ollama.com/v1/"
+    assert profile.model == "gpt-oss:120b"
+
+
+def test_provider_factory_requires_ollama_api_key(repository_root: Path) -> None:
+    config_path = repository_root / "config" / "default.yaml"
+    config = load_config(config_path, default_path=config_path, environment={})
+
+    with pytest.raises(ValueError, match="OLLAMA_API_KEY"):
+        ModelProviderFactory(config.models, {}).create_for_profile("fast")
 
 
 def test_token_aggregation_preserves_unknown_cached_usage() -> None:

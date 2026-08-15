@@ -177,9 +177,9 @@ async def test_evaluation_runner_builds_approach_model_cross_product(
         (result["approach"], result["model_profile"], result["provider"], result["model"])
         for result in results
     } == {
-        ("direct_llm", "reasoning", "ollama", "gpt-oss:120b-cloud"),
+        ("direct_llm", "reasoning", "ollama", "gpt-oss:120b"),
         ("direct_llm", "openrouter_test", "openrouter", "test/openrouter-model"),
-        ("text_rag", "reasoning", "ollama", "gpt-oss:120b-cloud"),
+        ("text_rag", "reasoning", "ollama", "gpt-oss:120b"),
         ("text_rag", "openrouter_test", "openrouter", "test/openrouter-model"),
     }
     assert metrics["matrix"]["combinations"] == 4

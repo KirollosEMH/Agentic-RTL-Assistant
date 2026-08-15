@@ -34,15 +34,15 @@ orchestration:
 
 models:
   profiles:
-    # Ollama Cloud is reached through the signed-in local Ollama gateway.
-    fast: {provider: ollama, model: gpt-oss:120b-cloud, timeout_seconds: 180, retries: 1}
-    reasoning: {provider: ollama, model: gpt-oss:120b-cloud, timeout_seconds: 300, retries: 1}
-    coding: {provider: ollama, model: gpt-oss:120b-cloud, timeout_seconds: 300, retries: 1}
+    fast: {provider: ollama, model: gpt-oss:120b, timeout_seconds: 180, retries: 1}
+    reasoning: {provider: ollama, model: gpt-oss:120b, timeout_seconds: 300, retries: 1}
+    coding: {provider: ollama, model: gpt-oss:120b, timeout_seconds: 300, retries: 1}
   providers:
     openai:
       api_key_env: OPENAI_API_KEY
     ollama:
-      base_url: http://localhost:11434/v1
+      base_url: https://ollama.com/v1/
+      api_key_env: OLLAMA_API_KEY
     openrouter:
       base_url: https://openrouter.ai/api/v1
       api_key_env: OPENROUTER_API_KEY

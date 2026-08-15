@@ -58,7 +58,7 @@ class ModelProviderFactory:
         base_url = provider.base_url
         if not base_url:
             raise ValueError(f"provider {name} requires a base_url")
-        api_key = self._secret(provider.api_key_env, required=name != "ollama") or "ollama"
+        api_key = self._secret(provider.api_key_env, required=True)
         return provider_class(
             api_key=api_key,
             base_url=base_url,

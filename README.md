@@ -38,9 +38,10 @@ Once `uv` is available, manually activating the environment is optional when usi
 ## Configuration
 
 `config/default.yaml` is complete and selects `multi_agent_graphrag`. Its model profiles use
-`gpt-oss:120b-cloud` through the signed-in local Ollama gateway. Run `ollama signin` and
-`ollama pull gpt-oss:120b-cloud` before using the default configuration. Use `config/local.yaml`
-to select different provider/model profiles.
+`gpt-oss:120b` through Ollama Cloud's OpenAI-compatible API. Create an Ollama API key, store it as
+`OLLAMA_API_KEY` in `.env`, and use `--env-file .env` when running the application. The Ollama CLI,
+`ollama signin`, and a local Ollama server are not required. Use `config/local.yaml` to select
+different provider/model profiles.
 
 Configuration precedence currently implemented is default YAML, selected YAML, then these
 environment overrides:
@@ -64,7 +65,7 @@ The files in `config/experiments/` override only the architecture family:
 Launch the Textual TUI:
 
 ```bash
-uv run rtl-assistant --config config/default.yaml
+uv run --env-file .env rtl-assistant --config config/default.yaml
 ```
 
 At startup, paste a project directory into the path field or select one from the directory tree,
@@ -79,7 +80,7 @@ session. The number of retained user/assistant messages is controlled by
 Run one headless request:
 
 ```bash
-uv run rtl-assistant --config config/default.yaml --ask "What modules are implemented in the project?"
+uv run --env-file .env rtl-assistant --config config/default.yaml --ask "What modules are implemented in the project?"
 ```
 
 Run the required evaluation dataset and persist resolved configuration, metrics, traces, and
@@ -133,7 +134,7 @@ activity. The TUI consumes these events, while the evaluation runner consumes th
 
 ## Current vertical slice
 
-With Ollama signed in and the configured cloud model available, the application can discover and
+With `OLLAMA_API_KEY` set and the configured cloud model available, the application can discover and
 parse the three starter modules, answer the required module-list/hierarchy/control questions using
 graph-and-source evidence, generate a `FifoBuffer`, validate its syntax/module name, display
 activity and token usage, and run the required evaluation cases. Reads are confined to the
