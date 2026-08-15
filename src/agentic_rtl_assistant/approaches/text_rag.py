@@ -8,6 +8,7 @@ from agentic_rtl_assistant.models.base import ModelProvider
 from agentic_rtl_assistant.models.types import ModelMessage, ModelRequest
 from agentic_rtl_assistant.session.models import as_model_messages, contextualize_request
 from agentic_rtl_assistant.telemetry.collector import TelemetryCollector
+from agentic_rtl_assistant.telemetry.context import ContextWindowMetrics
 from agentic_rtl_assistant.telemetry.timing import TimingMetrics
 from agentic_rtl_assistant.telemetry.traces import EventType, ExecutionTrace
 
@@ -73,6 +74,9 @@ class TextRAGApproach:
             answer=response.content,
             evidence=evidence,
             usage=response.usage,
+            context_window=ContextWindowMetrics.from_usage_events(
+                [response.usage], history_messages=len(context.recent_messages)
+            ),
             timing=TimingMetrics(
                 total_seconds=duration,
                 model_seconds=model_seconds,

@@ -4,7 +4,9 @@ import pytest
 
 from agentic_rtl_assistant.approaches.base import RunResult
 from agentic_rtl_assistant.config import load_config
+from agentic_rtl_assistant.models.types import TokenUsage
 from agentic_rtl_assistant.rtl.tools import WriteRequest
+from agentic_rtl_assistant.telemetry.context import ContextWindowMetrics
 from agentic_rtl_assistant.ui.app import RTLAssistantTUI, WriteConfirmationScreen
 
 
@@ -56,6 +58,23 @@ class ApprovalService(StubService):
             generated_code=source,
             written_files=("new_module.v",) if self.approved else (),
         )
+
+
+def test_context_summary_replaces_cached_token_display() -> None:
+    result = RunResult(
+        request_id="request",
+        approach="test",
+        usage=TokenUsage(900, 100, 400, 3),
+        context_window=ContextWindowMetrics(350, 500, 4),
+    )
+
+    summary = RTLAssistantTUI._context_summary(result)
+
+    assert summary == (
+        "context latest=350 peak=500 history_messages=4 "
+        "tokens total_in=900 out=100 calls=3"
+    )
+    assert "cached" not in summary
 
 
 @pytest.mark.asyncio

@@ -20,6 +20,7 @@ from textual.widgets import (
 from textual.worker import Worker
 
 from agentic_rtl_assistant.app.service import ApplicationService
+from agentic_rtl_assistant.approaches.base import RunResult
 from agentic_rtl_assistant.config.models import AppConfig
 from agentic_rtl_assistant.config.validation import validate_runtime_paths
 from agentic_rtl_assistant.rtl.tools import WriteRequest
@@ -202,6 +203,16 @@ class RTLAssistantTUI(App[None]):
     async def _confirm_write(self, request: WriteRequest) -> bool:
         return bool(await self.push_screen_wait(WriteConfirmationScreen(request)))
 
+    @staticmethod
+    def _context_summary(result: RunResult) -> str:
+        context = result.context_window
+        return (
+            f"context latest={context.latest_input_tokens} peak={context.peak_input_tokens} "
+            f"history_messages={context.history_messages} "
+            f"tokens total_in={result.usage.input_tokens} "
+            f"out={result.usage.output_tokens} calls={result.usage.llm_calls}"
+        )
+
     @work(
         name="assistant-request",
         group="assistant-requests",
@@ -231,10 +242,8 @@ class RTLAssistantTUI(App[None]):
                 chat.write(f"[bold green]Saved:[/] {path}")
             if result.write_error:
                 chat.write(f"[bold yellow]Write failed:[/] {result.write_error}")
-            cached = result.usage.cached_input_tokens
             self.query_one("#execution", RichLog).write(
-                f"tokens in={result.usage.input_tokens} cached={cached} "
-                f"out={result.usage.output_tokens} calls={result.usage.llm_calls}"
+                self._context_summary(result)
             )
         except Exception as exc:
             chat.write(f"[bold red]Error:[/] {type(exc).__name__}: {exc}")

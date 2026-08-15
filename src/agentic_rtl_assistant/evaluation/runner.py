@@ -32,6 +32,7 @@ from agentic_rtl_assistant.evaluation.retrieval import (
     score_retrieval,
 )
 from agentic_rtl_assistant.evaluation.validation import (
+    ExpectedInstance,
     ExpectedPort,
     ValidationScores,
     aggregate_validation_scores,
@@ -53,6 +54,7 @@ class EvaluationCase(BaseModel):
     expected_answer_facts: list[str] = Field(default_factory=list)
     expected_module: str | None = None
     expected_ports: list[ExpectedPort] = Field(default_factory=list)
+    expected_instances: list[ExpectedInstance] = Field(default_factory=list)
 
 
 class EvaluationDataset(BaseModel):
@@ -104,6 +106,24 @@ def _percentile(values: list[float], percentile: float) -> float:
     upper = min(lower + 1, len(ordered) - 1)
     fraction = position - lower
     return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
+
+
+def task_succeeded(
+    case: EvaluationCase,
+    *,
+    execution_success: bool,
+    correctness: CorrectnessScores | None,
+    validation: ValidationScores | None,
+) -> bool:
+    """Apply deterministic dataset contracts independently of process success."""
+
+    if not execution_success:
+        return False
+    if case.type == "code_generation":
+        return validation is not None and validation.validation_accuracy == 1.0
+    if correctness is not None and correctness.correctness is not None:
+        return correctness.correctness == 1.0
+    return True
 
 
 class EvaluationRunner:
@@ -163,6 +183,7 @@ class EvaluationRunner:
         result: RunResult | None,
         error: str | None = None,
     ) -> tuple[dict[str, object], EvaluationScores]:
+        execution_success = result is not None and result.succeeded and error is None
         record: dict[str, object] = {
             "approach": cell.approach.value,
             "model_profile": cell.profile_name,
@@ -170,7 +191,8 @@ class EvaluationRunner:
             "model": cell.profile.model,
             "case_id": case.id,
             "repetition": repetition,
-            "success": result.succeeded if result is not None else False,
+            "success": execution_success,
+            "execution_success": execution_success,
             "answer": result.answer if result is not None else None,
             "generated_code": result.generated_code if result is not None else None,
             "written_files": list(result.written_files) if result is not None else [],
@@ -182,6 +204,17 @@ class EvaluationRunner:
                 ),
                 "output_tokens": result.usage.output_tokens if result is not None else 0,
                 "llm_calls": result.usage.llm_calls if result is not None else 0,
+            },
+            "context": {
+                "latest_input_tokens": (
+                    result.context_window.latest_input_tokens if result is not None else 0
+                ),
+                "peak_input_tokens": (
+                    result.context_window.peak_input_tokens if result is not None else 0
+                ),
+                "history_messages": (
+                    result.context_window.history_messages if result is not None else 0
+                ),
             },
             "latency_seconds": result.timing.total_seconds if result is not None else 0.0,
             "error": error or (result.error if result is not None else None),
@@ -210,11 +243,7 @@ class EvaluationRunner:
             }
 
         validation = None
-        needs_structural_score = case.type == "code_generation" and (
-            "validation" in self.config.evaluation.metrics
-            or "correctness" in self.config.evaluation.metrics
-        )
-        if needs_structural_score:
+        if case.type == "code_generation":
             generated_code = result.generated_code if result is not None else None
             source = generated_code or extract_verilog(answer)
             validation = score_validation(
@@ -223,6 +252,7 @@ class EvaluationRunner:
                 runtime_validation=result.validation if result is not None else None,
                 expected_module=case.expected_module,
                 expected_ports=case.expected_ports,
+                expected_instances=case.expected_instances,
             )
             if "validation" in self.config.evaluation.metrics:
                 record["validation"] = {
@@ -234,16 +264,15 @@ class EvaluationRunner:
                     "scores": validation.as_dict(),
                 }
 
-        correctness = None
+        correctness = score_correctness(
+            answer,
+            expected_answer_entities=case.expected_answer_entities,
+            expected_answer_facts=case.expected_answer_facts,
+            rtl_structural_accuracy=(
+                validation.validation_accuracy if validation is not None else None
+            ),
+        )
         if "correctness" in self.config.evaluation.metrics:
-            correctness = score_correctness(
-                answer,
-                expected_answer_entities=case.expected_answer_entities,
-                expected_answer_facts=case.expected_answer_facts,
-                rtl_structural_accuracy=(
-                    validation.validation_accuracy if validation is not None else None
-                ),
-            )
             record["correctness"] = {"scores": correctness.as_dict()}
 
         grounding = None
@@ -259,6 +288,13 @@ class EvaluationRunner:
                 "scores": grounding.as_dict(),
             }
 
+        record["task_success"] = task_succeeded(
+            case,
+            execution_success=execution_success,
+            correctness=correctness,
+            validation=validation,
+        )
+
         return record, EvaluationScores(correctness, grounding, retrieval, validation)
 
     def _metrics(
@@ -271,6 +307,9 @@ class EvaluationRunner:
         cached_tokens_complete = True
         output_tokens = 0
         llm_calls = 0
+        latest_context_tokens: list[int] = []
+        peak_context_tokens: list[int] = []
+        history_messages: list[int] = []
         latencies: list[float] = []
         for result in results:
             usage = result["usage"]
@@ -283,17 +322,31 @@ class EvaluationRunner:
                 cached_tokens_complete = False
             else:
                 cached_tokens += int(cached)
+            context = result["context"]
+            assert isinstance(context, dict)
+            latest_context_tokens.append(int(context["latest_input_tokens"]))
+            peak_context_tokens.append(int(context["peak_input_tokens"]))
+            history_messages.append(int(context["history_messages"]))
             latencies.append(float(result["latency_seconds"]))
 
         requests = len(results)
-        successes = sum(bool(result["success"]) for result in results)
+        execution_successes = sum(
+            bool(result.get("execution_success", result["success"])) for result in results
+        )
+        task_successes = sum(bool(result["task_success"]) for result in results)
         total_tokens = input_tokens + output_tokens
         latency_seconds = sum(latencies)
 
         metrics: dict[str, object] = {
             "requests": requests,
-            "successes": successes,
-            "success_rate": successes / requests if requests else 0.0,
+            "successes": execution_successes,
+            "success_rate": execution_successes / requests if requests else 0.0,
+            "execution_successes": execution_successes,
+            "execution_success_rate": (
+                execution_successes / requests if requests else 0.0
+            ),
+            "task_successes": task_successes,
+            "task_success_rate": task_successes / requests if requests else 0.0,
             "input_tokens": input_tokens,
             "cached_input_tokens": cached_tokens if cached_tokens_complete else None,
             "output_tokens": output_tokens,
@@ -308,6 +361,16 @@ class EvaluationRunner:
                 cached_tokens / input_tokens
                 if cached_tokens_complete and input_tokens
                 else None
+            ),
+            "average_latest_context_tokens": (
+                fmean(latest_context_tokens) if latest_context_tokens else 0.0
+            ),
+            "average_peak_context_tokens": (
+                fmean(peak_context_tokens) if peak_context_tokens else 0.0
+            ),
+            "max_peak_context_tokens": max(peak_context_tokens, default=0),
+            "average_history_messages": (
+                fmean(history_messages) if history_messages else 0.0
             ),
             "average_latency_seconds": fmean(latencies) if latencies else 0.0,
             "p50_latency_seconds": _percentile(latencies, 0.50),

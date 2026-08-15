@@ -106,6 +106,12 @@ Run the full approach/model matrix across the configured Ollama and OpenRouter m
 uv run --env-file .env rtl-assistant eval --config config/eval-matrix.yaml
 ```
 
+Run the three-repetition Ollama comparison with the required and extended integration cases:
+
+```bash
+uv run --env-file .env rtl-assistant eval --config config/eval-ollama.yaml
+```
+
 The runner evaluates the cross product of `evaluation.approaches` and
 `evaluation.model_profiles`. Each named model profile represents one provider/model pair and is
 assigned to every agent role for that matrix cell, making comparisons consistent. Add another
@@ -120,20 +126,28 @@ aborting the remaining combinations.
 Evaluation quality metrics are selected with `evaluation.metrics`. Unknown names are rejected.
 Token usage, LLM calls, execution success, and latency are operational statistics and are always
 reported, including per-request averages, cached-token ratio when supplied by the provider, and
-p50/p95 latency.
+p50/p95 latency. Each result also reports the latest and peak model-input context sizes and the
+number of retained session-history messages supplied to the request.
+
+`execution_success_rate` reports requests that completed without an application or runtime
+validation error. `task_success_rate` is stricter: QA cases must satisfy every labeled answer
+requirement, while code-generation cases must satisfy the complete parser, module, port, and
+instance contract. The legacy `success_rate` remains an alias for execution success.
 
 Cases label retrieval with `expected_source_paths`, `expected_entities`, and
 `expected_relations`; answer correctness with `expected_answer_entities` and short
 `expected_answer_facts`; and generated RTL with `expected_module` and `expected_ports` entries
-containing `name`, `direction`, and optional `width`. The deterministic evaluators report:
+containing `name`, `direction`, and optional `width`. Integration cases can additionally use
+`expected_instances` entries containing `module` and an optional instance `name`. The deterministic
+evaluators report:
 
 - `correctness`: answer entity/fact recall or generated-RTL structural accuracy.
 - `grounding`: valid evidence-backed citation precision, expected-source citation recall, and
   answer-entity support. Citations use `path.v:start-end`.
 - `retrieval`: source precision/recall/F1, hit rate, MRR, entity recall, relation recall, and macro
   retrieval accuracy.
-- `validation`: independent parser success, runtime validation status, expected-module match, and
-  expected-port name/direction/width accuracy.
+- `validation`: independent parser success, runtime validation status, expected-module match,
+  expected-port name/direction/width accuracy, and expected-instance recall.
 
 `results.json` contains per-case scores, while `metrics.json` contains macro averages across
 evaluated requests.
@@ -153,6 +167,11 @@ remote/local adapters use their OpenAI-compatible endpoints. Cached input tokens
 when a provider does not report them. Credential-free deterministic model doubles exist only under
 `tests/` and are injected through the same provider boundary.
 
+The TUI emphasizes current context rather than provider-cache telemetry: `latest` is the input-token
+count of the final model call, `peak` is the largest model input during the request, and
+`history_messages` is the retained conversation history included with the request. Total input
+tokens remain visible for comparing the cost of multi-call approaches.
+
 Telemetry events are separate from logs and include request, agent, retrieval, and validation
 activity. The TUI consumes these events, while the evaluation runner consumes the common
 `RunResult`; neither depends on the other.
@@ -162,14 +181,14 @@ activity. The TUI consumes these events, while the evaluation runner consumes th
 With `OLLAMA_API_KEY` set and the configured cloud model available, the application can discover and
 parse the three starter modules, answer the required module-list/hierarchy/control questions using
 graph-and-source evidence, generate a `FifoBuffer`, validate its syntax/module name, display
-activity and token usage, and run the required evaluation cases. Reads are confined to the
+activity plus current/peak context usage, and run the required evaluation cases. Reads are confined to the
 configured project root. Generated RTL is displayed and can be written only after explicit approval.
 
 The A2 tool loop uses a provider-independent JSON protocol so it works through OpenAI, Ollama,
 OpenRouter, and Groq without provider-specific tool-call payloads. This first phase
 intentionally leaves embedding/vector retrieval, persistent graph backends, compiler/simulator
 integration, rich conversation summarization, provider-specific advanced options, and
-statistical/behavioral evaluators for later work.
+compiler-backed or simulation-backed behavioral evaluators for later work.
 
 ## Quality checks
 

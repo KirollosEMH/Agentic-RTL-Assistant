@@ -9,6 +9,7 @@ from agentic_rtl_assistant.models.providers.ollama import OllamaProvider
 from agentic_rtl_assistant.models.providers.openrouter import OpenRouterProvider
 from agentic_rtl_assistant.models.types import ModelRequest, TokenUsage
 from agentic_rtl_assistant.telemetry.collector import TelemetryCollector
+from agentic_rtl_assistant.telemetry.context import ContextWindowMetrics
 from agentic_rtl_assistant.telemetry.tokens import aggregate_usage
 from agentic_rtl_assistant.telemetry.traces import EventType, ExecutionTrace
 
@@ -48,6 +49,21 @@ def test_token_aggregation_preserves_unknown_cached_usage() -> None:
     assert usage.output_tokens == 3
     assert usage.cached_input_tokens is None
     assert usage.llm_calls == 2
+
+
+def test_context_metrics_preserve_latest_peak_and_history() -> None:
+    metrics = ContextWindowMetrics.from_usage_events(
+        [
+            TokenUsage(input_tokens=10),
+            TokenUsage(input_tokens=25),
+            TokenUsage(input_tokens=15),
+        ],
+        history_messages=4,
+    )
+
+    assert metrics.latest_input_tokens == 15
+    assert metrics.peak_input_tokens == 25
+    assert metrics.history_messages == 4
 
 
 def test_openrouter_forwards_session_id_for_sticky_routing() -> None:

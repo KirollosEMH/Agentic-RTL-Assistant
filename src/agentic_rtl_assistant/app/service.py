@@ -9,6 +9,7 @@ from agentic_rtl_assistant.config.models import AppConfig
 from agentic_rtl_assistant.rtl.tools import WriteConfirmation
 from agentic_rtl_assistant.session.store import InMemorySessionStore
 from agentic_rtl_assistant.telemetry.collector import TelemetryCollector
+from agentic_rtl_assistant.telemetry.context import ContextWindowMetrics
 from agentic_rtl_assistant.telemetry.timing import TimingMetrics
 from agentic_rtl_assistant.telemetry.traces import EventType, ExecutionTrace
 
@@ -66,6 +67,9 @@ class ApplicationService:
             result = RunResult(
                 request_id=request.request_id,
                 approach=self.approach.name,
+                context_window=ContextWindowMetrics(
+                    history_messages=len(context.recent_messages)
+                ),
                 timing=TimingMetrics(total_seconds=timeout),
                 traces=tuple(self.telemetry.for_request(request.request_id)),
                 error=f"request timed out after {timeout:g} seconds",

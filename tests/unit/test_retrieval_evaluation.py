@@ -9,13 +9,14 @@ from agentic_rtl_assistant.evaluation.retrieval import (
     aggregate_retrieval_scores,
     score_retrieval,
 )
-from agentic_rtl_assistant.evaluation.runner import EvaluationRunner
+from agentic_rtl_assistant.evaluation.runner import EvaluationRunner, load_dataset
 from agentic_rtl_assistant.knowledge.evidence import (
     EvidencePack,
     GraphRelation,
     SourceEvidence,
 )
 from agentic_rtl_assistant.models.types import TokenUsage
+from agentic_rtl_assistant.telemetry.context import ContextWindowMetrics
 from agentic_rtl_assistant.telemetry.timing import TimingMetrics
 
 
@@ -68,6 +69,18 @@ def test_retrieval_aggregate_ignores_unlabelled_categories() -> None:
     assert aggregate["entity_recall"] is None
 
 
+def test_extended_dataset_includes_integration_contract(repository_root: Path) -> None:
+    dataset = load_dataset(repository_root / "evals" / "cases" / "extended.yaml")
+
+    buffered = next(case for case in dataset.cases if case.id == "generate_buffered_pipeline")
+    assert buffered.expected_module == "BufferedDataPipeline"
+    assert {instance.module for instance in buffered.expected_instances} == {
+        "CounterProducer",
+        "FifoBuffer",
+        "DataConsumer",
+    }
+
+
 class StubTelemetry:
     events = ()
 
@@ -97,6 +110,7 @@ class QualityStubService:
                 approach="stub",
                 answer="```verilog\nmodule Demo(input wire clk); endmodule\n```",
                 usage=TokenUsage(20, 10, 5, 1),
+                context_window=ContextWindowMetrics(20, 20, 2),
                 timing=TimingMetrics(total_seconds=2.0),
             )
         return RunResult(
@@ -108,6 +122,7 @@ class QualityStubService:
                 source_evidence=(_source("data_pipeline.v", "module DataPipeline;"),),
             ),
             usage=TokenUsage(10, 5, 2, 1),
+            context_window=ContextWindowMetrics(10, 10, 0),
             timing=TimingMetrics(total_seconds=1.0),
         )
 
@@ -273,6 +288,8 @@ async def test_evaluation_runner_calculates_all_quality_and_operational_metrics(
     metrics = json.loads((run_directory / "metrics.json").read_text(encoding="utf-8"))
 
     assert results[0]["correctness"]["scores"]["correctness"] == 1.0
+    assert results[0]["execution_success"] is True
+    assert results[0]["task_success"] is True
     assert results[0]["grounding"]["scores"]["grounding_accuracy"] == 1.0
     assert results[1]["validation"]["source"] == "answer"
     assert results[1]["validation"]["scores"]["validation_accuracy"] == 1.0
@@ -280,11 +297,17 @@ async def test_evaluation_runner_calculates_all_quality_and_operational_metrics(
     assert metrics["grounding"]["evaluated_requests"] == 1
     assert metrics["retrieval"]["evaluated_requests"] == 1
     assert metrics["validation"]["evaluated_requests"] == 1
+    assert metrics["execution_success_rate"] == 1.0
+    assert metrics["task_success_rate"] == 1.0
     assert metrics["total_tokens"] == 45
     assert metrics["cached_input_tokens"] == 7
     assert metrics["cached_input_token_ratio"] == pytest.approx(7 / 30)
     assert metrics["average_total_tokens_per_request"] == 22.5
     assert metrics["average_tokens_per_llm_call"] == 22.5
+    assert metrics["average_latest_context_tokens"] == 15.0
+    assert metrics["average_peak_context_tokens"] == 15.0
+    assert metrics["max_peak_context_tokens"] == 20
+    assert metrics["average_history_messages"] == 1.0
     assert metrics["average_latency_seconds"] == 1.5
     assert metrics["p50_latency_seconds"] == 1.5
     assert metrics["p95_latency_seconds"] == pytest.approx(1.95)

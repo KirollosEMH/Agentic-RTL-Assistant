@@ -9,6 +9,7 @@ from agentic_rtl_assistant.models.types import TokenUsage
 from agentic_rtl_assistant.rtl.tools import WriteConfirmation
 from agentic_rtl_assistant.rtl.types import ValidationResult
 from agentic_rtl_assistant.session.models import ConversationMessage
+from agentic_rtl_assistant.telemetry.context import ContextWindowMetrics
 from agentic_rtl_assistant.telemetry.timing import TimingMetrics
 from agentic_rtl_assistant.telemetry.traces import ExecutionTrace
 
@@ -45,6 +46,7 @@ class RunResult:
     write_error: str | None = None
     evidence: EvidencePack = EvidencePack()
     usage: TokenUsage = TokenUsage()
+    context_window: ContextWindowMetrics = ContextWindowMetrics()
     timing: TimingMetrics = TimingMetrics()
     traces: tuple[ExecutionTrace, ...] = ()
     validation: ValidationResult | None = None

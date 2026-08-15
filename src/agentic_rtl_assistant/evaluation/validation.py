@@ -16,6 +16,12 @@ class ExpectedPort:
 
 
 @dataclass(frozen=True, slots=True)
+class ExpectedInstance:
+    module: str
+    name: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ValidationScores:
     validation_accuracy: float
     parser_valid: float
@@ -24,6 +30,7 @@ class ValidationScores:
     expected_port_recall: float | None
     expected_port_direction_accuracy: float | None
     expected_port_width_accuracy: float | None
+    expected_instance_recall: float | None
 
     def as_dict(self) -> dict[str, float | None]:
         return asdict(self)
@@ -62,6 +69,7 @@ def score_validation(
     runtime_validation: ValidationResult | None = None,
     expected_module: str | None = None,
     expected_ports: list[ExpectedPort] | tuple[ExpectedPort, ...] = (),
+    expected_instances: list[ExpectedInstance] | tuple[ExpectedInstance, ...] = (),
 ) -> ValidationScores:
     modules: tuple[ModuleInfo, ...] = ()
     parser_valid = 0.0
@@ -79,8 +87,9 @@ def score_validation(
     port_recall = None
     direction_accuracy = None
     width_accuracy = None
+    instance_recall = None
+    target = _target_module(modules, expected_module)
     if expected_ports:
-        target = _target_module(modules, expected_module)
         actual = {port.name: port for port in target.ports} if target is not None else {}
         port_recall = sum(port.name in actual for port in expected_ports) / len(expected_ports)
         direction_accuracy = sum(
@@ -96,6 +105,17 @@ def score_validation(
                 for port in ports_with_width
             ) / len(ports_with_width)
 
+    if expected_instances:
+        actual_instances = target.instances if target is not None else ()
+        instance_recall = sum(
+            any(
+                instance.module == expected.module
+                and (expected.name is None or instance.name == expected.name)
+                for instance in actual_instances
+            )
+            for expected in expected_instances
+        ) / len(expected_instances)
+
     structural_components = [
         score
         for score in (
@@ -105,6 +125,7 @@ def score_validation(
             port_recall,
             direction_accuracy,
             width_accuracy,
+            instance_recall,
         )
         if score is not None
     ]
@@ -118,6 +139,7 @@ def score_validation(
         expected_port_recall=port_recall,
         expected_port_direction_accuracy=direction_accuracy,
         expected_port_width_accuracy=width_accuracy,
+        expected_instance_recall=instance_recall,
     )
 
 

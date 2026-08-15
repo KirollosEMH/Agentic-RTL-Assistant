@@ -1,4 +1,5 @@
 from agentic_rtl_assistant.evaluation.validation import (
+    ExpectedInstance,
     ExpectedPort,
     ValidationScores,
     aggregate_validation_scores,
@@ -13,6 +14,7 @@ def validation_score(result: ValidationResult | None) -> float:
 
 
 __all__ = [
+    "ExpectedInstance",
     "ExpectedPort",
     "ValidationScores",
     "aggregate_validation_scores",

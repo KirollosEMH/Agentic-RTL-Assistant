@@ -4,7 +4,9 @@ import pytest
 
 from agentic_rtl_assistant.evaluation.correctness import score_correctness
 from agentic_rtl_assistant.evaluation.grounding import score_grounding
+from agentic_rtl_assistant.evaluation.runner import EvaluationCase, task_succeeded
 from agentic_rtl_assistant.evaluation.validation import (
+    ExpectedInstance,
     ExpectedPort,
     extract_verilog,
     score_validation,
@@ -55,11 +57,15 @@ def test_grounding_validates_citations_against_project_and_evidence(tmp_path: Pa
 
 def test_validation_scores_parser_module_and_port_contract() -> None:
     source = """
+module Child(input wire clk);
+endmodule
+
 module FifoBuffer (
     input wire clk,
     input wire [7:0] data_in,
     output wire [7:0] data_out
 );
+Child u_child(.clk(clk));
 assign data_out = data_in;
 endmodule
 """
@@ -74,6 +80,7 @@ endmodule
             ExpectedPort("data_in", "input", "[7:0]"),
             ExpectedPort("data_out", "output", "[7:0]"),
         ],
+        expected_instances=[ExpectedInstance("Child", "u_child")],
     )
 
     assert scores.validation_accuracy == 1.0
@@ -83,6 +90,7 @@ endmodule
     assert scores.expected_port_recall == 1.0
     assert scores.expected_port_direction_accuracy == 1.0
     assert scores.expected_port_width_accuracy == 1.0
+    assert scores.expected_instance_recall == 1.0
 
 
 def test_validation_marks_missing_code_as_failed() -> None:
@@ -101,3 +109,50 @@ def test_extract_verilog_from_markdown_answer() -> None:
     answer = "Here is the implementation:\n```verilog\nmodule Demo; endmodule\n```"
 
     assert extract_verilog(answer) == "module Demo; endmodule"
+
+
+def test_task_success_is_distinct_from_execution_success() -> None:
+    qa_case = EvaluationCase(
+        id="qa",
+        type="qa",
+        prompt="Explain Demo",
+        expected_answer_entities=["Demo", "Missing"],
+    )
+    partial = score_correctness(
+        "Demo exists.", expected_answer_entities=qa_case.expected_answer_entities
+    )
+    complete = score_correctness(
+        "Demo and Missing exist.",
+        expected_answer_entities=qa_case.expected_answer_entities,
+    )
+
+    assert not task_succeeded(
+        qa_case,
+        execution_success=True,
+        correctness=partial,
+        validation=None,
+    )
+    assert task_succeeded(
+        qa_case,
+        execution_success=True,
+        correctness=complete,
+        validation=None,
+    )
+
+    code_case = EvaluationCase(
+        id="code",
+        type="code_generation",
+        prompt="Generate Demo",
+        expected_module="Demo",
+    )
+    invalid = score_validation(
+        None,
+        parser=PyVerilogParser(),
+        expected_module="Demo",
+    )
+    assert not task_succeeded(
+        code_case,
+        execution_success=True,
+        correctness=None,
+        validation=invalid,
+    )

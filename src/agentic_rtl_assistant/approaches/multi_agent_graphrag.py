@@ -7,6 +7,7 @@ from agentic_rtl_assistant.knowledge.evidence import EvidencePack
 from agentic_rtl_assistant.models.types import TokenUsage
 from agentic_rtl_assistant.orchestration.state import AgentState
 from agentic_rtl_assistant.telemetry.collector import TelemetryCollector
+from agentic_rtl_assistant.telemetry.context import ContextWindowMetrics
 from agentic_rtl_assistant.telemetry.timing import TimingMetrics
 from agentic_rtl_assistant.telemetry.tokens import aggregate_usage
 from agentic_rtl_assistant.telemetry.traces import EventType, ExecutionTrace
@@ -65,6 +66,9 @@ class MultiAgentGraphRAGApproach:
                 request_id=request.request_id,
                 approach=self.name,
                 usage=TokenUsage(),
+                context_window=ContextWindowMetrics(
+                    history_messages=len(context.recent_messages)
+                ),
                 timing=TimingMetrics(total_seconds=duration),
                 traces=tuple(self.telemetry.for_request(request.request_id)),
                 provider=self.provider,
@@ -82,6 +86,7 @@ class MultiAgentGraphRAGApproach:
         )
         self.telemetry.record(completed)
         evidence = state.get("evidence", EvidencePack())
+        usage_events = state.get("usage_events", [])
         return RunResult(
             request_id=request.request_id,
             approach=self.name,
@@ -90,7 +95,10 @@ class MultiAgentGraphRAGApproach:
             written_files=tuple(state.get("written_files", [])),
             write_error=state.get("write_error"),
             evidence=evidence,
-            usage=aggregate_usage(state.get("usage_events", [])),
+            usage=aggregate_usage(usage_events),
+            context_window=ContextWindowMetrics.from_usage_events(
+                usage_events, history_messages=len(context.recent_messages)
+            ),
             timing=TimingMetrics(
                 total_seconds=duration,
                 retrieval_seconds=evidence.metrics.retrieval_latency_seconds,

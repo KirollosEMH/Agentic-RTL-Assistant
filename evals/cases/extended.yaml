@@ -1,1 +1,41 @@
-cases: []
+cases:
+  - id: trace_ready_valid_path
+    type: qa
+    prompt: >
+      Trace the complete ready/valid and data path from CounterProducer through
+      DataPipeline to DataConsumer. Explain when data advances and how reset and
+      enable signals affect both endpoints.
+    expected_source_paths: [counter_producer.v, data_consumer.v, data_pipeline.v]
+    expected_entities:
+      [DataPipeline, CounterProducer, DataConsumer, data_out, data_valid, ready_in, ready_out]
+    expected_relations:
+      - [DataPipeline, INSTANTIATES, CounterProducer]
+      - [DataPipeline, INSTANTIATES, DataConsumer]
+    expected_answer_entities:
+      [DataPipeline, CounterProducer, DataConsumer, data_out, data_valid, ready_in, ready_out]
+    expected_answer_facts:
+      - "CounterProducer data_out DataConsumer data_in"
+      - "CounterProducer data_valid DataConsumer data_valid"
+      - "DataConsumer ready_out CounterProducer ready_in"
+      - "rst_n CounterProducer DataConsumer"
+
+  - id: generate_buffered_pipeline
+    type: code_generation
+    prompt: >
+      Implement a top-level module named BufferedDataPipeline with inputs clk, rst_n,
+      producer_enable, and consumer_enable. Instantiate CounterProducer, FifoBuffer,
+      and DataConsumer and connect them as a ready/valid pipeline. Assume FifoBuffer
+      uses inputs clk, rst_n, data_in[7:0], data_valid, and ready_in, and outputs
+      ready_out, data_out[7:0], and data_out_valid.
+    expected_source_paths: [counter_producer.v, data_consumer.v, data_pipeline.v]
+    expected_entities: [DataPipeline, CounterProducer, DataConsumer]
+    expected_module: BufferedDataPipeline
+    expected_ports:
+      - {name: clk, direction: input}
+      - {name: rst_n, direction: input}
+      - {name: producer_enable, direction: input}
+      - {name: consumer_enable, direction: input}
+    expected_instances:
+      - {module: CounterProducer}
+      - {module: FifoBuffer}
+      - {module: DataConsumer}

@@ -31,6 +31,8 @@ async def test_list_modules_vertical_slice(service: ApplicationService) -> None:
     )
     assert {"DataPipeline", "CounterProducer", "DataConsumer"} <= set(result.evidence.entities)
     assert result.usage.llm_calls == 2
+    assert 0 < result.context_window.latest_input_tokens <= result.usage.input_tokens
+    assert result.context_window.latest_input_tokens <= result.context_window.peak_input_tokens
 
 
 @pytest.mark.asyncio

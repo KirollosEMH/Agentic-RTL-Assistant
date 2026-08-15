@@ -19,6 +19,7 @@ from agentic_rtl_assistant.rtl.repository import RTLRepository, RTLRepositoryErr
 from agentic_rtl_assistant.rtl.tools import RTLWriteTool, WriteRequest
 from agentic_rtl_assistant.session.models import as_model_messages
 from agentic_rtl_assistant.telemetry.collector import TelemetryCollector
+from agentic_rtl_assistant.telemetry.context import ContextWindowMetrics
 from agentic_rtl_assistant.telemetry.timing import TimingMetrics
 from agentic_rtl_assistant.telemetry.tokens import aggregate_usage
 from agentic_rtl_assistant.telemetry.traces import EventType, ExecutionTrace
@@ -68,12 +69,26 @@ class SingleAgentApproach:
         candidate = content.strip()
         fenced = re.fullmatch(r"```(?:json)?\s*(.*?)\s*```", candidate, re.DOTALL)
         if fenced:
-            candidate = fenced.group(1)
+            candidate = fenced.group(1).strip()
         try:
             value = json.loads(candidate)
         except (json.JSONDecodeError, TypeError):
+            decoder = json.JSONDecoder()
+            for start, character in enumerate(candidate):
+                if character != "{":
+                    continue
+                try:
+                    value, _ = decoder.raw_decode(candidate, start)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(value, dict) and ("tool" in value or "answer" in value):
+                    return value
             return None
-        return value if isinstance(value, dict) else None
+        return (
+            value
+            if isinstance(value, dict) and ("tool" in value or "answer" in value)
+            else None
+        )
 
     def _allowed_path(self, raw_path: object) -> tuple[Path, str]:
         if not isinstance(raw_path, str) or not raw_path.strip():
@@ -258,7 +273,11 @@ class SingleAgentApproach:
             )
             usages.append(response.usage)
             action = self._json_object(response.content)
-            if action is not None and isinstance(action.get("answer"), str):
+            if (
+                action is not None
+                and "tool" not in action
+                and isinstance(action.get("answer"), str)
+            ):
                 if source_tool_calls:
                     final_answer = action["answer"].strip()
                     break
@@ -275,9 +294,6 @@ class SingleAgentApproach:
                 continue
 
             if action is None or "tool" not in action:
-                if source_tool_calls and response.content.strip():
-                    final_answer = response.content.strip()
-                    break
                 messages.extend(
                     (
                         ModelMessage("assistant", response.content),
@@ -351,7 +367,7 @@ class SingleAgentApproach:
             tool_calls += 1
             messages.extend(
                 (
-                    ModelMessage("assistant", response.content),
+                    ModelMessage("assistant", json.dumps(action)),
                     ModelMessage(
                         "user",
                         f"Tool result for {tool_name}:\n{result_content}\n\n"
@@ -394,6 +410,9 @@ class SingleAgentApproach:
             written_files=tuple(dict.fromkeys(written_files)),
             evidence=evidence,
             usage=aggregate_usage(usages),
+            context_window=ContextWindowMetrics.from_usage_events(
+                usages, history_messages=len(context.recent_messages)
+            ),
             timing=TimingMetrics(
                 total_seconds=duration,
                 model_seconds=max(0.0, duration - retrieval_seconds),

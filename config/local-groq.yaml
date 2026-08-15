@@ -1,0 +1,27 @@
+project:
+  root: descriptive_verilog_design
+
+models:
+  profiles:
+    fast:
+      provider: groq
+      model: llama-3.1-8b-instant
+      timeout_seconds: 180
+      retries: 1
+
+    reasoning:
+      provider: groq
+      model: llama-3.1-8b-instant
+      timeout_seconds: 300
+      retries: 1
+
+    coding:
+      provider: groq
+      model: llama-3.1-8b-instant
+      timeout_seconds: 300
+      retries: 1
+
+  providers:
+    groq:
+      base_url: https://api.groq.com/openai/v1
+      api_key_env: GROQ_API_KEY
