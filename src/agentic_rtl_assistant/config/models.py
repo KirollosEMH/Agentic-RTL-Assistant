@@ -21,6 +21,13 @@ class ApproachType(StrEnum):
     MULTI_AGENT_GRAPHRAG = "multi_agent_graphrag"
 
 
+class EvaluationMetric(StrEnum):
+    CORRECTNESS = "correctness"
+    GROUNDING = "grounding"
+    RETRIEVAL = "retrieval"
+    VALIDATION = "validation"
+
+
 class ProjectSettings(StrictModel):
     root: Path
     verilog_extensions: list[str] = Field(default_factory=lambda: [".v", ".sv"])
@@ -125,7 +132,7 @@ class TelemetrySettings(StrictModel):
 
 class EvaluationSettings(StrictModel):
     datasets: list[Path] = Field(default_factory=list)
-    metrics: list[str] = Field(default_factory=list)
+    metrics: list[EvaluationMetric] = Field(default_factory=list)
     repetitions: int = Field(default=1, ge=1)
     approaches: list[ApproachType] = Field(default_factory=list)
     model_profiles: list[str] = Field(default_factory=list)

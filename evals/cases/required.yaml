@@ -4,6 +4,7 @@ cases:
     prompt: "What modules are implemented in the project?"
     expected_source_paths: [counter_producer.v, data_consumer.v, data_pipeline.v]
     expected_entities: [DataPipeline, CounterProducer, DataConsumer]
+    expected_answer_entities: [DataPipeline, CounterProducer, DataConsumer]
 
   - id: explain_pipeline
     type: qa
@@ -13,18 +14,36 @@ cases:
     expected_relations:
       - [DataPipeline, INSTANTIATES, CounterProducer]
       - [DataPipeline, INSTANTIATES, DataConsumer]
+    expected_answer_entities: [DataPipeline, CounterProducer, DataConsumer]
+    expected_answer_facts:
+      - "DataPipeline instantiates CounterProducer"
+      - "DataPipeline instantiates DataConsumer"
 
   - id: producer_controls
     type: qa
     prompt: "What signals control the behavior of CounterProducer?"
     expected_source_paths: [counter_producer.v]
     expected_entities: [CounterProducer, enable, ready_in, rst_n, clk]
+    expected_answer_entities: [CounterProducer, enable, ready_in, rst_n, clk]
+    expected_answer_facts:
+      - "enable ready_in increments data_out"
+      - "rst_n resets data_out data_valid"
 
   - id: generate_fifo
     type: code_generation
     prompt: >
-      Implement a module named FifoBuffer that acts as a buffer
-      between CounterProducer and DataConsumer.
+      Implement a module named FifoBuffer that acts as a one-entry ready/valid buffer
+      between CounterProducer and DataConsumer. Use inputs clk, rst_n, data_in[7:0],
+      data_valid, and ready_in; and outputs ready_out, data_out[7:0], and data_out_valid.
     expected_source_paths: [counter_producer.v, data_consumer.v]
     expected_entities: [CounterProducer, DataConsumer]
     expected_module: FifoBuffer
+    expected_ports:
+      - {name: clk, direction: input}
+      - {name: rst_n, direction: input}
+      - {name: data_in, direction: input, width: "[7:0]"}
+      - {name: data_valid, direction: input}
+      - {name: ready_in, direction: input}
+      - {name: ready_out, direction: output}
+      - {name: data_out, direction: output, width: "[7:0]"}
+      - {name: data_out_valid, direction: output}

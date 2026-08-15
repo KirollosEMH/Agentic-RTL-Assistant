@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from agentic_rtl_assistant.approaches.base import RunResult
-from agentic_rtl_assistant.config import ApproachType, load_config
+from agentic_rtl_assistant.config import ApproachType, EvaluationMetric, load_config
 from agentic_rtl_assistant.evaluation.retrieval import (
     aggregate_retrieval_scores,
     score_retrieval,
@@ -15,6 +15,8 @@ from agentic_rtl_assistant.knowledge.evidence import (
     GraphRelation,
     SourceEvidence,
 )
+from agentic_rtl_assistant.models.types import TokenUsage
+from agentic_rtl_assistant.telemetry.timing import TimingMetrics
 
 
 def _source(path: str, content: str = "") -> SourceEvidence:
@@ -85,6 +87,31 @@ class StubService:
         )
 
 
+class QualityStubService:
+    telemetry = StubTelemetry()
+
+    async def ask(self, prompt: str) -> RunResult:
+        if "Generate Demo" in prompt:
+            return RunResult(
+                request_id="code-request",
+                approach="stub",
+                answer="```verilog\nmodule Demo(input wire clk); endmodule\n```",
+                usage=TokenUsage(20, 10, 5, 1),
+                timing=TimingMetrics(total_seconds=2.0),
+            )
+        return RunResult(
+            request_id="qa-request",
+            approach="stub",
+            answer="DataPipeline is defined at [data_pipeline.v:1-2].",
+            evidence=EvidencePack(
+                entities=("DataPipeline",),
+                source_evidence=(_source("data_pipeline.v", "module DataPipeline;"),),
+            ),
+            usage=TokenUsage(10, 5, 2, 1),
+            timing=TimingMetrics(total_seconds=1.0),
+        )
+
+
 @pytest.mark.asyncio
 async def test_evaluation_runner_persists_retrieval_scores(
     repository_root: Path, tmp_path: Path
@@ -107,7 +134,7 @@ async def test_evaluation_runner_persists_retrieval_scores(
             "evaluation": config.evaluation.model_copy(
                 update={
                     "datasets": [dataset],
-                    "metrics": ["retrieval"],
+                    "metrics": [EvaluationMetric.RETRIEVAL],
                     "approaches": [ApproachType.MULTI_AGENT_GRAPHRAG],
                     "model_profiles": ["reasoning"],
                 }
@@ -126,6 +153,9 @@ async def test_evaluation_runner_persists_retrieval_scores(
     assert results[0]["retrieval"]["retrieved_source_paths"] == ["data_pipeline.v"]
     assert metrics["retrieval"]["evaluated_requests"] == 1
     assert metrics["retrieval"]["source_precision_at_k"] == 1.0
+    assert metrics["total_tokens"] == 0
+    assert metrics["average_latency_seconds"] == 0.0
+    assert metrics["p95_latency_seconds"] == 0.0
 
 
 @pytest.mark.asyncio
@@ -191,3 +221,70 @@ async def test_evaluation_runner_builds_approach_model_cross_product(
         for settings in selected_config.orchestration.agents.values()
     } == {"reasoning", "openrouter_test"}
     assert len(list((run_directory / "combinations").iterdir())) == 4
+
+
+@pytest.mark.asyncio
+async def test_evaluation_runner_calculates_all_quality_and_operational_metrics(
+    repository_root: Path, tmp_path: Path
+) -> None:
+    dataset = tmp_path / "quality.yaml"
+    dataset.write_text(
+        """cases:
+  - id: grounded_qa
+    type: qa
+    prompt: Explain DataPipeline
+    expected_source_paths: [data_pipeline.v]
+    expected_entities: [DataPipeline]
+    expected_answer_entities: [DataPipeline]
+  - id: generated_rtl
+    type: code_generation
+    prompt: Generate Demo
+    expected_module: Demo
+    expected_ports:
+      - {name: clk, direction: input}
+""",
+        encoding="utf-8",
+    )
+    config_path = repository_root / "config" / "default.yaml"
+    config = load_config(config_path, default_path=config_path, environment={})
+    config = config.model_copy(
+        update={
+            "evaluation": config.evaluation.model_copy(
+                update={
+                    "datasets": [dataset],
+                    "metrics": [
+                        EvaluationMetric.CORRECTNESS,
+                        EvaluationMetric.GROUNDING,
+                        EvaluationMetric.RETRIEVAL,
+                        EvaluationMetric.VALIDATION,
+                    ],
+                    "approaches": [ApproachType.MULTI_AGENT_GRAPHRAG],
+                    "model_profiles": ["reasoning"],
+                }
+            ),
+            "telemetry": config.telemetry.model_copy(
+                update={"persistence_path": tmp_path / "runs"}
+            ),
+        }
+    )
+
+    run_directory = await EvaluationRunner(config, lambda _config: QualityStubService()).run()
+    results = json.loads((run_directory / "results.json").read_text(encoding="utf-8"))
+    metrics = json.loads((run_directory / "metrics.json").read_text(encoding="utf-8"))
+
+    assert results[0]["correctness"]["scores"]["correctness"] == 1.0
+    assert results[0]["grounding"]["scores"]["grounding_accuracy"] == 1.0
+    assert results[1]["validation"]["source"] == "answer"
+    assert results[1]["validation"]["scores"]["validation_accuracy"] == 1.0
+    assert metrics["correctness"]["evaluated_requests"] == 2
+    assert metrics["grounding"]["evaluated_requests"] == 1
+    assert metrics["retrieval"]["evaluated_requests"] == 1
+    assert metrics["validation"]["evaluated_requests"] == 1
+    assert metrics["total_tokens"] == 45
+    assert metrics["cached_input_tokens"] == 7
+    assert metrics["cached_input_token_ratio"] == pytest.approx(7 / 30)
+    assert metrics["average_total_tokens_per_request"] == 22.5
+    assert metrics["average_tokens_per_llm_call"] == 22.5
+    assert metrics["average_latency_seconds"] == 1.5
+    assert metrics["p50_latency_seconds"] == 1.5
+    assert metrics["p95_latency_seconds"] == pytest.approx(1.95)

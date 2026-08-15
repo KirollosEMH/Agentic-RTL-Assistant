@@ -117,11 +117,26 @@ The matrix creates a parent run under `runs/matrix/` with aggregate `results.jso
 configuration and artifacts for every approach/model pairing. A failed request is recorded without
 aborting the remaining combinations.
 
-Evaluation cases can label `expected_source_paths`, `expected_entities`, and
-`expected_relations`. When `retrieval` is enabled in `evaluation.metrics`, `results.json` contains
-per-case source precision/recall/F1, hit rate, MRR, entity recall, relation recall, and a macro
-retrieval-accuracy score. `metrics.json` contains the corresponding averages across evaluated
-requests.
+Evaluation quality metrics are selected with `evaluation.metrics`. Unknown names are rejected.
+Token usage, LLM calls, execution success, and latency are operational statistics and are always
+reported, including per-request averages, cached-token ratio when supplied by the provider, and
+p50/p95 latency.
+
+Cases label retrieval with `expected_source_paths`, `expected_entities`, and
+`expected_relations`; answer correctness with `expected_answer_entities` and short
+`expected_answer_facts`; and generated RTL with `expected_module` and `expected_ports` entries
+containing `name`, `direction`, and optional `width`. The deterministic evaluators report:
+
+- `correctness`: answer entity/fact recall or generated-RTL structural accuracy.
+- `grounding`: valid evidence-backed citation precision, expected-source citation recall, and
+  answer-entity support. Citations use `path.v:start-end`.
+- `retrieval`: source precision/recall/F1, hit rate, MRR, entity recall, relation recall, and macro
+  retrieval accuracy.
+- `validation`: independent parser success, runtime validation status, expected-module match, and
+  expected-port name/direction/width accuracy.
+
+`results.json` contains per-case scores, while `metrics.json` contains macro averages across
+evaluated requests.
 
 ## Architecture
 

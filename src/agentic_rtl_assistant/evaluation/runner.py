@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from statistics import fmean
 from typing import Literal
 
 import yaml
@@ -15,12 +16,30 @@ from pydantic import BaseModel, Field
 from agentic_rtl_assistant.app.service import ApplicationService
 from agentic_rtl_assistant.approaches.base import RunResult
 from agentic_rtl_assistant.config.models import AppConfig, ApproachType, ModelProfile
+from agentic_rtl_assistant.evaluation.correctness import (
+    CorrectnessScores,
+    aggregate_correctness_scores,
+    score_correctness,
+)
+from agentic_rtl_assistant.evaluation.grounding import (
+    GroundingScores,
+    aggregate_grounding_scores,
+    score_grounding,
+)
 from agentic_rtl_assistant.evaluation.retrieval import (
     RetrievalScores,
     aggregate_retrieval_scores,
     score_retrieval,
 )
+from agentic_rtl_assistant.evaluation.validation import (
+    ExpectedPort,
+    ValidationScores,
+    aggregate_validation_scores,
+    extract_verilog,
+    score_validation,
+)
 from agentic_rtl_assistant.knowledge.evidence import EvidencePack
+from agentic_rtl_assistant.rtl.parser import PyVerilogParser
 
 
 class EvaluationCase(BaseModel):
@@ -30,7 +49,10 @@ class EvaluationCase(BaseModel):
     expected_source_paths: list[str] = Field(default_factory=list)
     expected_entities: list[str] = Field(default_factory=list)
     expected_relations: list[tuple[str, str, str]] = Field(default_factory=list)
+    expected_answer_entities: list[str] = Field(default_factory=list)
+    expected_answer_facts: list[str] = Field(default_factory=list)
     expected_module: str | None = None
+    expected_ports: list[ExpectedPort] = Field(default_factory=list)
 
 
 class EvaluationDataset(BaseModel):
@@ -50,6 +72,14 @@ class EvaluationCell:
         return re.sub(r"[^A-Za-z0-9_.-]+", "_", raw)
 
 
+@dataclass(frozen=True, slots=True)
+class EvaluationScores:
+    correctness: CorrectnessScores | None = None
+    grounding: GroundingScores | None = None
+    retrieval: RetrievalScores | None = None
+    validation: ValidationScores | None = None
+
+
 def load_dataset(path: Path) -> EvaluationDataset:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     return EvaluationDataset.model_validate(data)
@@ -63,6 +93,17 @@ def _config_hash(config: AppConfig) -> tuple[str, str]:
 
 def _unique[T](values: list[T]) -> list[T]:
     return list(dict.fromkeys(values))
+
+
+def _percentile(values: list[float], percentile: float) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * percentile
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    fraction = position - lower
+    return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
 
 
 class EvaluationRunner:
@@ -121,7 +162,7 @@ class EvaluationRunner:
         repetition: int,
         result: RunResult | None,
         error: str | None = None,
-    ) -> tuple[dict[str, object], RetrievalScores | None]:
+    ) -> tuple[dict[str, object], EvaluationScores]:
         record: dict[str, object] = {
             "approach": cell.approach.value,
             "model_profile": cell.profile_name,
@@ -145,39 +186,92 @@ class EvaluationRunner:
             "latency_seconds": result.timing.total_seconds if result is not None else 0.0,
             "error": error or (result.error if result is not None else None),
         }
-        if "retrieval" not in self.config.evaluation.metrics:
-            return record, None
-
         evidence = result.evidence if result is not None else EvidencePack()
-        scores = score_retrieval(
-            evidence,
-            expected_source_paths=case.expected_source_paths,
-            expected_entities=case.expected_entities,
-            expected_relations=case.expected_relations,
+        answer = result.answer if result is not None else None
+
+        retrieval = None
+        if "retrieval" in self.config.evaluation.metrics:
+            retrieval = score_retrieval(
+                evidence,
+                expected_source_paths=case.expected_source_paths,
+                expected_entities=case.expected_entities,
+                expected_relations=case.expected_relations,
+            )
+            record["retrieval"] = {
+                "retrieved_source_paths": list(
+                    dict.fromkeys(item.path for item in evidence.source_evidence)
+                ),
+                "retrieved_entities": list(evidence.entities),
+                "retrieved_relations": [
+                    [item.source, item.relation, item.target]
+                    for item in evidence.relations
+                ],
+                "scores": retrieval.as_dict(),
+            }
+
+        validation = None
+        needs_structural_score = case.type == "code_generation" and (
+            "validation" in self.config.evaluation.metrics
+            or "correctness" in self.config.evaluation.metrics
         )
-        record["retrieval"] = {
-            "retrieved_source_paths": list(
-                dict.fromkeys(item.path for item in evidence.source_evidence)
-            ),
-            "retrieved_entities": list(evidence.entities),
-            "retrieved_relations": [
-                [item.source, item.relation, item.target] for item in evidence.relations
-            ],
-            "scores": scores.as_dict(),
-        }
-        return record, scores
+        if needs_structural_score:
+            generated_code = result.generated_code if result is not None else None
+            source = generated_code or extract_verilog(answer)
+            validation = score_validation(
+                source,
+                parser=PyVerilogParser(),
+                runtime_validation=result.validation if result is not None else None,
+                expected_module=case.expected_module,
+                expected_ports=case.expected_ports,
+            )
+            if "validation" in self.config.evaluation.metrics:
+                record["validation"] = {
+                    "source": (
+                        "generated_code"
+                        if generated_code
+                        else "answer" if source is not None else None
+                    ),
+                    "scores": validation.as_dict(),
+                }
+
+        correctness = None
+        if "correctness" in self.config.evaluation.metrics:
+            correctness = score_correctness(
+                answer,
+                expected_answer_entities=case.expected_answer_entities,
+                expected_answer_facts=case.expected_answer_facts,
+                rtl_structural_accuracy=(
+                    validation.validation_accuracy if validation is not None else None
+                ),
+            )
+            record["correctness"] = {"scores": correctness.as_dict()}
+
+        grounding = None
+        if "grounding" in self.config.evaluation.metrics and case.type == "qa":
+            grounding = score_grounding(
+                answer,
+                evidence,
+                project_root=cell.config.project.root,
+                expected_source_paths=case.expected_source_paths,
+                expected_answer_entities=case.expected_answer_entities,
+            )
+            record["grounding"] = {
+                "scores": grounding.as_dict(),
+            }
+
+        return record, EvaluationScores(correctness, grounding, retrieval, validation)
 
     def _metrics(
         self,
         results: list[dict[str, object]],
-        retrieval_scores: list[RetrievalScores],
+        scores: list[EvaluationScores],
     ) -> dict[str, object]:
         input_tokens = 0
         cached_tokens = 0
         cached_tokens_complete = True
         output_tokens = 0
         llm_calls = 0
-        latency_seconds = 0.0
+        latencies: list[float] = []
         for result in results:
             usage = result["usage"]
             assert isinstance(usage, dict)
@@ -189,26 +283,59 @@ class EvaluationRunner:
                 cached_tokens_complete = False
             else:
                 cached_tokens += int(cached)
-            latency_seconds += float(result["latency_seconds"])
+            latencies.append(float(result["latency_seconds"]))
+
+        requests = len(results)
+        successes = sum(bool(result["success"]) for result in results)
+        total_tokens = input_tokens + output_tokens
+        latency_seconds = sum(latencies)
 
         metrics: dict[str, object] = {
-            "requests": len(results),
-            "successes": sum(bool(result["success"]) for result in results),
+            "requests": requests,
+            "successes": successes,
+            "success_rate": successes / requests if requests else 0.0,
             "input_tokens": input_tokens,
             "cached_input_tokens": cached_tokens if cached_tokens_complete else None,
             "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
             "llm_calls": llm_calls,
             "latency_seconds": latency_seconds,
+            "average_input_tokens_per_request": input_tokens / requests if requests else 0.0,
+            "average_output_tokens_per_request": output_tokens / requests if requests else 0.0,
+            "average_total_tokens_per_request": total_tokens / requests if requests else 0.0,
+            "average_tokens_per_llm_call": total_tokens / llm_calls if llm_calls else 0.0,
+            "cached_input_token_ratio": (
+                cached_tokens / input_tokens
+                if cached_tokens_complete and input_tokens
+                else None
+            ),
+            "average_latency_seconds": fmean(latencies) if latencies else 0.0,
+            "p50_latency_seconds": _percentile(latencies, 0.50),
+            "p95_latency_seconds": _percentile(latencies, 0.95),
         }
+        if "correctness" in self.config.evaluation.metrics:
+            metrics["correctness"] = aggregate_correctness_scores(
+                [score.correctness for score in scores if score.correctness is not None]
+            )
+        if "grounding" in self.config.evaluation.metrics:
+            metrics["grounding"] = aggregate_grounding_scores(
+                [score.grounding for score in scores if score.grounding is not None]
+            )
         if "retrieval" in self.config.evaluation.metrics:
-            metrics["retrieval"] = aggregate_retrieval_scores(retrieval_scores)
+            metrics["retrieval"] = aggregate_retrieval_scores(
+                [score.retrieval for score in scores if score.retrieval is not None]
+            )
+        if "validation" in self.config.evaluation.metrics:
+            metrics["validation"] = aggregate_validation_scores(
+                [score.validation for score in scores if score.validation is not None]
+            )
         return metrics
 
     async def _run_cell(
         self, cell: EvaluationCell
-    ) -> tuple[list[dict[str, object]], list[RetrievalScores], list[dict[str, object]]]:
+    ) -> tuple[list[dict[str, object]], list[EvaluationScores], list[dict[str, object]]]:
         results: list[dict[str, object]] = []
-        retrieval_scores: list[RetrievalScores] = []
+        scores: list[EvaluationScores] = []
         traces: list[dict[str, object]] = []
         service: ApplicationService | None = None
         startup_error: str | None = None
@@ -228,12 +355,11 @@ class EvaluationRunner:
                             result = await service.ask(case.prompt)
                         except Exception as exc:  # preserve partial matrix results
                             error = f"{type(exc).__name__}: {exc}"
-                    record, scores = self._result_record(
+                    record, result_scores = self._result_record(
                         cell, case, repetition, result, error
                     )
                     results.append(record)
-                    if scores is not None:
-                        retrieval_scores.append(scores)
+                    scores.append(result_scores)
 
         if service is not None:
             for event in service.telemetry.events:
@@ -247,7 +373,7 @@ class EvaluationRunner:
                     }
                 )
                 traces.append(trace)
-        return results, retrieval_scores, traces
+        return results, scores, traces
 
     async def run(self) -> Path:
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -257,7 +383,7 @@ class EvaluationRunner:
         (run_directory / "config.yaml").write_text(serialized, encoding="utf-8")
 
         all_results: list[dict[str, object]] = []
-        all_scores: list[RetrievalScores] = []
+        all_scores: list[EvaluationScores] = []
         all_traces: list[dict[str, object]] = []
         comparisons: list[dict[str, object]] = []
         combinations_directory = run_directory / "combinations"
