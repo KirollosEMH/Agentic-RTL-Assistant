@@ -12,27 +12,22 @@ orchestration:
   timeout_seconds: 120
   agents:
     intent_classifier:
-      enabled: true
       model: fast
       temperature: 0.0
       prompt: prompts/intent_classifier.md
     single_agent:
-      enabled: true
       model: reasoning
       temperature: 0.0
       prompt: prompts/single_agent.md
     rtl_explanation:
-      enabled: true
       model: reasoning
       temperature: 0.1
       prompt: prompts/rtl_explanation.md
     rtl_codegen:
-      enabled: true
       model: coding
       temperature: 0.1
       prompt: prompts/rtl_codegen.md
     rtl_repair:
-      enabled: true
       model: coding
       temperature: 0.0
       prompt: prompts/rtl_repair.md
@@ -60,13 +55,11 @@ models:
 
 knowledge:
   graph:
-    enabled: true
     backend: memory
     build_mode: lazy
     extracted_node_types: [file, module, port, instance]
     relationship_types: [defines, has_port, has_instance, instantiates, instance_of]
   graphrag:
-    enabled: true
     max_hops: 2
     max_nodes: 24
     max_source_chunks: 6
@@ -74,7 +67,6 @@ knowledge:
     include_graph_facts: true
     include_source_evidence: true
   text_rag:
-    enabled: true
     chunking_strategy: rtl_semantic
     max_chunks: 6
     max_chunk_tokens: 1200

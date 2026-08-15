@@ -136,8 +136,6 @@ class ApproachFactory:
 
     def _build_agent(self, name: str, agent_class):
         settings = self._agent_config(name)
-        if not settings.enabled:
-            raise ValueError(f"required agent is disabled: {name}")
         provider, profile = self.model_factory.create_for_profile(settings.model)
         return agent_class(provider, settings, profile)
 

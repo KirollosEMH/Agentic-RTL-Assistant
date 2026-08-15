@@ -15,11 +15,13 @@ def test_default_configuration_selects_primary_architecture(repository_root: Pat
     assert config.project.root == repository_root / "descriptive_verilog_design"
 
 
-def test_graphrag_requires_enabled_graph(repository_root: Path, tmp_path: Path) -> None:
+def test_removed_knowledge_enabled_flag_is_rejected(
+    repository_root: Path, tmp_path: Path
+) -> None:
     override = tmp_path / "invalid.yaml"
     override.write_text("knowledge:\n  graph:\n    enabled: false\n", encoding="utf-8")
 
-    with pytest.raises(ValidationError, match="requires knowledge.graph.enabled"):
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         load_config(
             override,
             default_path=repository_root / "config" / "default.yaml",

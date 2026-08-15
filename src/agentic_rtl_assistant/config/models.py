@@ -34,7 +34,6 @@ class ApproachSettings(StrictModel):
 
 
 class AgentSettings(StrictModel):
-    enabled: bool = True
     model: str
     temperature: float = Field(default=0.0, ge=0.0, le=2.0)
     prompt: Path
@@ -67,7 +66,6 @@ class ModelsSettings(StrictModel):
 
 
 class GraphSettings(StrictModel):
-    enabled: bool = True
     backend: Literal["memory"] = "memory"
     build_mode: Literal["lazy", "eager"] = "lazy"
     extracted_node_types: list[str] = Field(default_factory=list)
@@ -75,7 +73,6 @@ class GraphSettings(StrictModel):
 
 
 class GraphRAGSettings(StrictModel):
-    enabled: bool = True
     max_hops: int = Field(default=2, ge=0)
     max_nodes: int = Field(default=24, ge=1)
     max_source_chunks: int = Field(default=6, ge=1)
@@ -85,7 +82,6 @@ class GraphRAGSettings(StrictModel):
 
 
 class TextRAGSettings(StrictModel):
-    enabled: bool = True
     chunking_strategy: Literal["rtl_semantic", "module"] = "rtl_semantic"
     max_chunks: int = Field(default=6, ge=1)
     max_chunk_tokens: int = Field(default=1200, ge=1)
@@ -161,22 +157,10 @@ class AppConfig(StrictModel):
 
     @model_validator(mode="after")
     def validate_architecture(self) -> AppConfig:
-        approach = self.approach.type
-        if approach is ApproachType.MULTI_AGENT_GRAPHRAG:
-            if not self.knowledge.graph.enabled:
-                raise ValueError("multi_agent_graphrag requires knowledge.graph.enabled=true")
-            if not self.knowledge.graphrag.enabled:
-                raise ValueError("multi_agent_graphrag requires knowledge.graphrag.enabled=true")
-        if (
-            approach in {ApproachType.TEXT_RAG, ApproachType.MULTI_AGENT_RAG}
-            and not self.knowledge.text_rag.enabled
-        ):
-            raise ValueError(f"{approach.value} requires knowledge.text_rag.enabled=true")
-
         missing_profiles = {
             agent.model
             for agent in self.orchestration.agents.values()
-            if agent.enabled and agent.model not in self.models.profiles
+            if agent.model not in self.models.profiles
         }
         missing_profiles.update(
             profile

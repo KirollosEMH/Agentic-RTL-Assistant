@@ -13,7 +13,7 @@ def validate_runtime_paths(config: AppConfig) -> None:
     missing_prompts = [
         settings.prompt
         for settings in config.orchestration.agents.values()
-        if settings.enabled and not Path(settings.prompt).is_file()
+        if not Path(settings.prompt).is_file()
     ]
     if missing_prompts:
         joined = ", ".join(str(path) for path in missing_prompts)
