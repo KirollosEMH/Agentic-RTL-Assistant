@@ -35,6 +35,33 @@ def test_removed_knowledge_enabled_flag_is_rejected(
         )
 
 
+@pytest.mark.parametrize(
+    "removed_setting",
+    [
+        "knowledge:\n  graph:\n    backend: memory\n",
+        "knowledge:\n  graph:\n    extracted_node_types: [module]\n",
+        "knowledge:\n  graph:\n    relationship_types: [instantiates]\n",
+        "knowledge:\n  text_rag:\n    chunking_strategy: module\n",
+        "rtl:\n  parser_backend: pyverilog\n",
+        "rtl:\n  validation:\n    parser_check: true\n",
+        "context:\n  token_budget:\n    max_request_tokens: 8000\n",
+        "ui:\n  type: textual\n",
+    ],
+)
+def test_removed_non_operational_settings_are_rejected(
+    repository_root: Path, tmp_path: Path, removed_setting: str
+) -> None:
+    override = tmp_path / "removed-setting.yaml"
+    override.write_text(removed_setting, encoding="utf-8")
+
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        load_config(
+            override,
+            default_path=repository_root / "config" / "default.yaml",
+            environment={},
+        )
+
+
 def test_agent_model_profile_must_exist(repository_root: Path, tmp_path: Path) -> None:
     override = tmp_path / "invalid-profile.yaml"
     override.write_text(

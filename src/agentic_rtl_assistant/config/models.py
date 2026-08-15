@@ -70,10 +70,7 @@ class ModelsSettings(StrictModel):
 
 
 class GraphSettings(StrictModel):
-    backend: Literal["memory"] = "memory"
     build_mode: Literal["lazy", "eager"] = "lazy"
-    extracted_node_types: list[str] = Field(default_factory=list)
-    relationship_types: list[str] = Field(default_factory=list)
 
 
 class GraphRAGSettings(StrictModel):
@@ -86,7 +83,6 @@ class GraphRAGSettings(StrictModel):
 
 
 class TextRAGSettings(StrictModel):
-    chunking_strategy: Literal["rtl_semantic", "module"] = "rtl_semantic"
     max_chunks: int = Field(default=6, ge=1)
     max_chunk_tokens: int = Field(default=1200, ge=1)
 
@@ -97,10 +93,6 @@ class KnowledgeSettings(StrictModel):
     text_rag: TextRAGSettings
 
 
-class ValidationSettings(StrictModel):
-    parser_check: bool = True
-
-
 class FilesystemSettings(StrictModel):
     allow_reads: bool = True
     allow_writes: bool = False
@@ -108,13 +100,10 @@ class FilesystemSettings(StrictModel):
 
 
 class RTLSettings(StrictModel):
-    parser_backend: Literal["pyverilog"] = "pyverilog"
-    validation: ValidationSettings
     filesystem: FilesystemSettings
 
 
 class TokenBudgetSettings(StrictModel):
-    max_request_tokens: int = Field(default=8000, ge=1)
     max_evidence_tokens: int = Field(default=4000, ge=1)
 
 
@@ -138,15 +127,6 @@ class EvaluationSettings(StrictModel):
     model_profiles: list[str] = Field(default_factory=list)
 
 
-class UISettings(StrictModel):
-    type: Literal["textual"] = "textual"
-    show_execution_panel: bool = True
-    show_token_panel: bool = True
-    show_metrics_panel: bool = True
-    show_agent_activity: bool = True
-    show_tool_activity: bool = True
-
-
 class AppConfig(StrictModel):
     project: ProjectSettings
     approach: ApproachSettings
@@ -157,7 +137,6 @@ class AppConfig(StrictModel):
     context: ContextSettings
     telemetry: TelemetrySettings
     evaluation: EvaluationSettings
-    ui: UISettings
 
     @model_validator(mode="after")
     def validate_architecture(self) -> AppConfig:
@@ -184,9 +163,4 @@ class AppConfig(StrictModel):
             names = ", ".join(sorted(missing_providers))
             raise ValueError(f"model profiles reference unknown provider(s): {names}")
 
-        if (
-            self.context.token_budget.max_evidence_tokens
-            > self.context.token_budget.max_request_tokens
-        ):
-            raise ValueError("max_evidence_tokens cannot exceed max_request_tokens")
         return self

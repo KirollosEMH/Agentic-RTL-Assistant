@@ -3,23 +3,12 @@ models:
     fast:
       provider: openrouter
       model: nvidia/nemotron-3-ultra-550b-a55b:free
-      timeout_seconds: 180
-      retries: 1
     reasoning:
       provider: openrouter
       model: nvidia/nemotron-3-ultra-550b-a55b:free
-      timeout_seconds: 300
-      retries: 1
     coding:
       provider: openrouter
       model: nvidia/nemotron-3-ultra-550b-a55b:free
-      timeout_seconds: 300
-      retries: 1
-
-  providers:
-    openrouter:
-      base_url: https://openrouter.ai/api/v1
-      api_key_env: OPENROUTER_API_KEY
 
 telemetry:
   persistence_path: runs/openrouter

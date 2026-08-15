@@ -1,32 +1,15 @@
 models:
   profiles:
     fast:
-      provider: ollama
       model: gpt-oss:120b-cloud
-      timeout_seconds: 180
-      retries: 1
     reasoning:
-      provider: ollama
       model: gpt-oss:120b-cloud
-      timeout_seconds: 300
-      retries: 1
     coding:
-      provider: ollama
       model: gpt-oss:120b-cloud
-      timeout_seconds: 300
-      retries: 1
-
-  providers:
-    ollama:
-      base_url: https://ollama.com/v1/
-      api_key_env: OLLAMA_API_KEY
 
 telemetry:
   persistence_path: runs/ollama
 
 evaluation:
   datasets: [evals/cases/required.yaml, evals/cases/extended.yaml]
-  metrics: [correctness, grounding, retrieval, validation]
   repetitions: 3
-  approaches: [direct_llm, text_rag, single_agent, multi_agent_rag, multi_agent_graphrag]
-  model_profiles: [reasoning]

@@ -52,10 +52,7 @@ models:
 
 knowledge:
   graph:
-    backend: memory
     build_mode: lazy
-    extracted_node_types: [file, module, port, instance]
-    relationship_types: [defines, has_port, has_instance, instantiates, instance_of]
   graphrag:
     max_hops: 2
     max_nodes: 24
@@ -64,14 +61,10 @@ knowledge:
     include_graph_facts: true
     include_source_evidence: true
   text_rag:
-    chunking_strategy: rtl_semantic
     max_chunks: 6
     max_chunk_tokens: 1200
 
 rtl:
-  parser_backend: pyverilog
-  validation:
-    parser_check: true
   filesystem:
     allow_reads: true
     allow_writes: true
@@ -82,7 +75,6 @@ context:
   max_resolved_entities: 24
   max_evidence_items: 12
   token_budget:
-    max_request_tokens: 8000
     max_evidence_tokens: 4000
 
 telemetry:
@@ -96,11 +88,3 @@ evaluation:
   repetitions: 1
   approaches: [direct_llm, text_rag, single_agent, multi_agent_rag, multi_agent_graphrag]
   model_profiles: [reasoning]
-
-ui:
-  type: textual
-  show_execution_panel: true
-  show_token_panel: true
-  show_metrics_panel: true
-  show_agent_activity: true
-  show_tool_activity: true
