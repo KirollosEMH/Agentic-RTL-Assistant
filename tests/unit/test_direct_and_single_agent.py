@@ -10,7 +10,10 @@ from agentic_rtl_assistant.models.types import (
     ModelResponse,
     TokenUsage,
 )
+from agentic_rtl_assistant.rtl.parser import PyVerilogParser
 from agentic_rtl_assistant.rtl.repository import RTLRepository
+from agentic_rtl_assistant.rtl.tools import RTLWriteTool, WriteRequest
+from agentic_rtl_assistant.rtl.validator import RTLValidator
 from agentic_rtl_assistant.telemetry.collector import TelemetryCollector
 from agentic_rtl_assistant.telemetry.traces import EventType
 
@@ -122,3 +125,52 @@ async def test_single_agent_rejects_paths_outside_project(rtl_root: Path) -> Non
     assert "path escapes project root" in provider.requests[1].messages[-1].content
     assert result.answer == "The project contains three RTL files."
     assert [item.path for item in result.evidence.source_evidence] == ["data_pipeline.v"]
+
+
+async def test_single_agent_can_write_approved_rtl_file(tmp_path: Path) -> None:
+    rtl_root = tmp_path / "rtl"
+    rtl_root.mkdir()
+    (rtl_root / "existing.v").write_text(
+        "module Existing; endmodule\n", encoding="utf-8"
+    )
+    repository = RTLRepository(rtl_root, allow_writes=True)
+    provider = ScriptedProvider(
+        [
+            '{"tool":"read_file","arguments":{"path":"existing.v"}}',
+            '{"tool":"write_file","arguments":{"path":"new_module.v",'
+            '"content":"module NewModule; endmodule"}}',
+            '{"answer":"Created new_module.v after inspecting existing.v."}',
+        ]
+    )
+    write_tool = RTLWriteTool(
+        repository,
+        RTLValidator(PyVerilogParser(repository)),
+        require_confirmation=True,
+    )
+    confirmations: list[WriteRequest] = []
+
+    async def approve(request: WriteRequest) -> bool:
+        confirmations.append(request)
+        return True
+
+    approach = SingleAgentApproach(
+        provider,
+        repository,
+        model="test-model",
+        provider_name=provider.name,
+        prompt="Use project tools.",
+        telemetry=TelemetryCollector(),
+        write_tool=write_tool,
+    )
+
+    result = await approach.run(
+        UserRequest.create("Inspect the project and create NewModule."),
+        RunContext(write_confirmation=approve),
+    )
+
+    assert result.succeeded
+    assert result.written_files == ("new_module.v",)
+    assert confirmations[0].path == "new_module.v"
+    assert (rtl_root / "new_module.v").read_text(encoding="utf-8") == (
+        "module NewModule; endmodule\n"
+    )

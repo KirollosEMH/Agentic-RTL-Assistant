@@ -18,6 +18,7 @@ def build_workflow(nodes: WorkflowNodes, *, max_repair_attempts: int):
     graph.add_node("generate", nodes.generate)
     graph.add_node("validate", nodes.validate)
     graph.add_node("repair", nodes.repair)
+    graph.add_node("write", nodes.write_generated_code)
     graph.add_node("finalize", nodes.finalize)
 
     graph.add_edge(START, "classify_intent")
@@ -33,5 +34,6 @@ def build_workflow(nodes: WorkflowNodes, *, max_repair_attempts: int):
         ),
     )
     graph.add_edge("repair", "validate")
+    graph.add_edge("write", "finalize")
     graph.add_edge("finalize", END)
     return graph.compile()

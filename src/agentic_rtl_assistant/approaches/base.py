@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from agentic_rtl_assistant.knowledge.evidence import EvidencePack
 from agentic_rtl_assistant.models.types import TokenUsage
+from agentic_rtl_assistant.rtl.tools import WriteConfirmation
 from agentic_rtl_assistant.rtl.types import ValidationResult
 from agentic_rtl_assistant.session.models import ConversationMessage
 from agentic_rtl_assistant.telemetry.timing import TimingMetrics
@@ -27,6 +28,7 @@ class RunContext:
     session_id: str | None = None
     recent_messages: tuple[ConversationMessage, ...] = ()
     resolved_entities: tuple[str, ...] = ()
+    write_confirmation: WriteConfirmation | None = None
 
     @property
     def model_metadata(self) -> dict[str, str]:
@@ -39,6 +41,8 @@ class RunResult:
     approach: str
     answer: str | None = None
     generated_code: str | None = None
+    written_files: tuple[str, ...] = ()
+    write_error: str | None = None
     evidence: EvidencePack = EvidencePack()
     usage: TokenUsage = TokenUsage()
     timing: TimingMetrics = TimingMetrics()

@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 import pytest
@@ -63,3 +64,43 @@ async def test_fifo_generation_is_validated_without_writing(service: Application
     assert "module FifoBuffer" in result.generated_code
     assert result.validation is not None and result.validation.valid
     assert not (service.config.project.root / "fifo_buffer.v").exists()
+
+
+@pytest.mark.asyncio
+async def test_fifo_generation_writes_only_after_confirmation(
+    repository_root: Path,
+    rtl_root: Path,
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "rtl"
+    shutil.copytree(rtl_root, project)
+    config_path = repository_root / "config" / "default.yaml"
+    config = load_config(config_path, default_path=config_path, environment={})
+    config = config.model_copy(
+        update={"project": config.project.model_copy(update={"root": project})}
+    )
+    telemetry = TelemetryCollector(config.telemetry.enabled)
+    approach_factory = ApproachFactory(
+        config,
+        telemetry,
+        StubModelProviderFactory(config.models),
+    )
+    service = ApplicationService(config, approach_factory, telemetry)
+    confirmations = []
+
+    async def approve(request) -> bool:
+        confirmations.append(request)
+        return True
+
+    result = await service.ask(
+        "Implement a module named FifoBuffer that acts as a buffer "
+        "between CounterProducer and DataConsumer.",
+        write_confirmation=approve,
+    )
+
+    assert result.succeeded
+    assert result.written_files == ("fifo_buffer.v",)
+    assert confirmations[0].path == "fifo_buffer.v"
+    assert "module FifoBuffer" in (project / "fifo_buffer.v").read_text(
+        encoding="utf-8"
+    )

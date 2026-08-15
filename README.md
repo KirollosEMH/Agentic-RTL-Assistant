@@ -72,10 +72,20 @@ At startup, paste a project directory into the path field or select one from the
 then choose **Open project**. The configured YAML project root is only the initial selection in
 interactive mode.
 
+Requests run in a Textual background worker so the interface continues to update while model calls
+are active. The complete workflow is bounded by `orchestration.timeout_seconds`; failures and
+timeouts are displayed in the chat while the request controls are restored for another attempt.
+
 The TUI keeps a bounded in-memory conversation session for follow-up questions. Use **New
 session** to clear the active conversation context. Opening another project also starts a fresh
 session. The number of retained user/assistant messages is controlled by
 `context.max_conversation_messages`.
+
+The single-agent approach exposes `list_files`, `read_file`, `search_source`, and `write_file`.
+The multi-agent generation workflow can also persist parser-valid generated RTL. All write targets
+are confined to the selected project and restricted to configured RTL extensions. With the default
+`rtl.filesystem` settings, each create or replacement opens an approval dialog showing the target
+and proposed contents. Headless runs do not write when confirmation is required.
 
 Run one headless request:
 
@@ -138,13 +148,13 @@ With `OLLAMA_API_KEY` set and the configured cloud model available, the applicat
 parse the three starter modules, answer the required module-list/hierarchy/control questions using
 graph-and-source evidence, generate a `FifoBuffer`, validate its syntax/module name, display
 activity and token usage, and run the required evaluation cases. Reads are confined to the
-configured project root and generated RTL is displayed only; it is not written automatically.
+configured project root. Generated RTL is displayed and can be written only after explicit approval.
 
 The A2 tool loop uses a provider-independent JSON protocol so it works through OpenAI, Ollama,
 OpenRouter, and Groq without provider-specific tool-call payloads. This first phase
 intentionally leaves embedding/vector retrieval, persistent graph backends, compiler/simulator
-integration, safe confirmed writes, rich conversation summarization, provider-specific advanced
-options, and statistical/behavioral evaluators for later work.
+integration, rich conversation summarization, provider-specific advanced options, and
+statistical/behavioral evaluators for later work.
 
 ## Quality checks
 

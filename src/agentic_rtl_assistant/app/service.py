@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import asyncio
 from uuid import uuid4
 
 from agentic_rtl_assistant.approaches.base import RunContext, RunResult, UserRequest
 from agentic_rtl_assistant.approaches.factory import ApproachFactory
 from agentic_rtl_assistant.config.models import AppConfig
+from agentic_rtl_assistant.rtl.tools import WriteConfirmation
 from agentic_rtl_assistant.session.store import InMemorySessionStore
 from agentic_rtl_assistant.telemetry.collector import TelemetryCollector
+from agentic_rtl_assistant.telemetry.timing import TimingMetrics
+from agentic_rtl_assistant.telemetry.traces import EventType, ExecutionTrace
 
 
 class ApplicationService:
@@ -28,7 +32,13 @@ class ApplicationService:
         self.sessions.get_or_create(session_id)
         return session_id
 
-    async def ask(self, text: str, *, session_id: str | None = None) -> RunResult:
+    async def ask(
+        self,
+        text: str,
+        *,
+        session_id: str | None = None,
+        write_confirmation: WriteConfirmation | None = None,
+    ) -> RunResult:
         request_text = text.strip()
         if not request_text:
             raise ValueError("request cannot be empty")
@@ -38,8 +48,28 @@ class ApplicationService:
             session_id=session_id,
             recent_messages=tuple(session.recent_messages) if session else (),
             resolved_entities=tuple(session.resolved_entities) if session else (),
+            write_confirmation=write_confirmation,
         )
-        result = await self.approach.run(UserRequest.create(request_text), context)
+        request = UserRequest.create(request_text)
+        timeout = self.config.orchestration.timeout_seconds
+        try:
+            async with asyncio.timeout(timeout):
+                result = await self.approach.run(request, context)
+        except TimeoutError:
+            trace = ExecutionTrace(
+                request.request_id,
+                "application_service",
+                EventType.REQUEST_FAILED,
+                metadata={"reason": "timeout", "timeout_seconds": timeout},
+            )
+            self.telemetry.record(trace)
+            result = RunResult(
+                request_id=request.request_id,
+                approach=self.approach.name,
+                timing=TimingMetrics(total_seconds=timeout),
+                traces=tuple(self.telemetry.for_request(request.request_id)),
+                error=f"request timed out after {timeout:g} seconds",
+            )
         response_text = result.generated_code or result.answer
         if session is not None and result.succeeded and response_text:
             session.record_turn(

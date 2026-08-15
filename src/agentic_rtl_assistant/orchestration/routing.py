@@ -16,9 +16,9 @@ def route_after_retrieval(state: AgentState) -> Literal["explain", "generate"]:
 
 def route_after_validation(
     state: AgentState, *, max_repair_attempts: int
-) -> Literal["repair", "finalize"]:
+) -> Literal["repair", "write", "finalize"]:
     validation = state.get("validation_result")
     attempts = state.get("repair_attempts", 0)
     if validation is not None and not validation.valid and attempts < max_repair_attempts:
         return "repair"
-    return "finalize"
+    return "write" if validation is not None and validation.valid else "finalize"

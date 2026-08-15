@@ -18,6 +18,12 @@ from agentic_rtl_assistant.agents.types import (
 )
 from agentic_rtl_assistant.knowledge.evidence import EvidencePack
 from agentic_rtl_assistant.orchestration.state import AgentState
+from agentic_rtl_assistant.rtl.repository import RTLRepositoryError
+from agentic_rtl_assistant.rtl.tools import (
+    RTLWriteTool,
+    WriteDeclinedError,
+    WriteRequest,
+)
 from agentic_rtl_assistant.rtl.validator import RTLValidator
 from agentic_rtl_assistant.session.models import contextualize_request
 from agentic_rtl_assistant.telemetry.collector import TelemetryCollector
@@ -40,6 +46,7 @@ class WorkflowNodes:
         repair_agent: RTLRepairAgent,
         retrieval: RetrievalService,
         validator: RTLValidator,
+        write_tool: RTLWriteTool,
         telemetry: TelemetryCollector,
     ) -> None:
         self.intent_agent = intent_agent
@@ -48,6 +55,7 @@ class WorkflowNodes:
         self.repair_agent = repair_agent
         self.retrieval = retrieval
         self.validator = validator
+        self.write_tool = write_tool
         self.telemetry = telemetry
 
     def _trace(
@@ -218,6 +226,66 @@ class WorkflowNodes:
             "generated_code": result.output.code,
             "repair_attempts": attempts,
             "usage_events": [result.usage],
+            "traces": [start, end],
+        }
+
+    def _generated_path(self, source: str) -> str:
+        modules = self.validator.parser.parse_text(source)
+        if not modules:
+            raise ValueError("generated RTL does not contain a module name")
+        module_name = modules[0].name
+        snake = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", module_name)
+        snake = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", snake).lower()
+        return f"{snake}.v"
+
+    async def write_generated_code(self, state: AgentState) -> dict[str, object]:
+        if not self.write_tool.enabled:
+            return {"write_status": "disabled"}
+        confirmation = state.get("write_confirmation")
+        if self.write_tool.require_confirmation and confirmation is None:
+            return {"write_status": "confirmation_unavailable"}
+
+        source = state.get("generated_code", "")
+        path = self._generated_path(source)
+        target = self.write_tool.repository.resolve(path)
+        request = WriteRequest(path, source, overwrite=target.exists())
+        started = time.perf_counter()
+        start = self._trace(state, "write_file", EventType.TOOL_STARTED)
+        try:
+            result = await self.write_tool.execute(request, confirmation)
+        except WriteDeclinedError:
+            end = self._trace(
+                state,
+                "write_file",
+                EventType.TOOL_COMPLETED,
+                duration=time.perf_counter() - started,
+                metadata={"path": path, "status": "declined"},
+            )
+            return {"write_status": "declined", "traces": [start, end]}
+        except (OSError, RTLRepositoryError, ValueError) as exc:
+            end = self._trace(
+                state,
+                "write_file",
+                EventType.TOOL_COMPLETED,
+                duration=time.perf_counter() - started,
+                metadata={"path": path, "status": "failed", "error": str(exc)},
+            )
+            return {
+                "write_status": "failed",
+                "write_error": str(exc),
+                "traces": [start, end],
+            }
+
+        end = self._trace(
+            state,
+            "write_file",
+            EventType.TOOL_COMPLETED,
+            duration=time.perf_counter() - started,
+            metadata={"path": result.path, "status": "written"},
+        )
+        return {
+            "written_files": [result.path],
+            "write_status": "written",
             "traces": [start, end],
         }
 

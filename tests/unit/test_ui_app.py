@@ -2,8 +2,10 @@ from pathlib import Path
 
 import pytest
 
+from agentic_rtl_assistant.approaches.base import RunResult
 from agentic_rtl_assistant.config import load_config
-from agentic_rtl_assistant.ui.app import RTLAssistantTUI
+from agentic_rtl_assistant.rtl.tools import WriteRequest
+from agentic_rtl_assistant.ui.app import RTLAssistantTUI, WriteConfirmationScreen
 
 
 class StubTelemetry:
@@ -23,6 +25,37 @@ class StubService:
     def create_session(self) -> str:
         self.created_sessions += 1
         return f"session-{self.created_sessions}"
+
+
+class FailingService(StubService):
+    def __init__(self, config) -> None:
+        super().__init__(config)
+        self.ask_calls = 0
+
+    async def ask(self, text, *, session_id=None, write_confirmation=None):
+        del text, session_id, write_confirmation
+        self.ask_calls += 1
+        raise RuntimeError("provider failed")
+
+
+class ApprovalService(StubService):
+    def __init__(self, config) -> None:
+        super().__init__(config)
+        self.approved: bool | None = None
+
+    async def ask(self, text, *, session_id=None, write_confirmation=None):
+        del text, session_id
+        assert write_confirmation is not None
+        source = "module NewModule; endmodule\n"
+        self.approved = await write_confirmation(
+            WriteRequest("new_module.v", source)
+        )
+        return RunResult(
+            request_id="request",
+            approach="test",
+            generated_code=source,
+            written_files=("new_module.v",) if self.approved else (),
+        )
 
 
 @pytest.mark.asyncio
@@ -81,3 +114,55 @@ async def test_invalid_project_keeps_setup_visible(repository_root: Path) -> Non
         assert app.service is None
         assert "does not exist" in str(app.query_one("#project-error").render())
         assert not app.query_one("#project-setup").has_class("hidden")
+
+
+@pytest.mark.asyncio
+async def test_request_worker_restores_controls_after_exception(
+    repository_root: Path, rtl_root: Path
+) -> None:
+    config_path = repository_root / "config" / "default.yaml"
+    config = load_config(config_path, default_path=config_path, environment={})
+    app = RTLAssistantTUI(config, service_factory=FailingService)
+
+    async with app.run_test() as pilot:
+        app.query_one("#project-path").value = str(rtl_root)
+        await pilot.click("#open-project")
+        question = app.query_one("#question")
+        question.value = "trigger an error"
+        question.focus()
+        await pilot.press("enter")
+        assert app._request_worker is not None
+        await app._request_worker.wait()
+
+        assert isinstance(app.service, FailingService)
+        assert app.service.ask_calls == 1
+        assert not question.disabled
+        assert not app.query_one("#new-session").disabled
+        assert not app.query_one("#choose-project").disabled
+
+
+@pytest.mark.asyncio
+async def test_request_worker_waits_for_write_confirmation(
+    repository_root: Path, rtl_root: Path
+) -> None:
+    config_path = repository_root / "config" / "default.yaml"
+    config = load_config(config_path, default_path=config_path, environment={})
+    app = RTLAssistantTUI(config, service_factory=ApprovalService)
+
+    async with app.run_test() as pilot:
+        app.query_one("#project-path").value = str(rtl_root)
+        await pilot.click("#open-project")
+        question = app.query_one("#question")
+        question.value = "create a module"
+        question.focus()
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert isinstance(app.screen, WriteConfirmationScreen)
+        await pilot.click("#approve-write")
+        assert app._request_worker is not None
+        await app._request_worker.wait()
+
+        assert isinstance(app.service, ApprovalService)
+        assert app.service.approved is True
+        assert not question.disabled

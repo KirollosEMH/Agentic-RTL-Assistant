@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -30,6 +31,15 @@ class RecordingApproachFactory:
 
     def create(self) -> RecordingApproach:
         return self.approach
+
+
+class SlowApproach:
+    name = "slow"
+
+    async def run(self, request, context) -> RunResult:
+        del request, context
+        await asyncio.sleep(10)
+        raise AssertionError("timeout should cancel the approach")
 
 
 @pytest.mark.asyncio
@@ -80,3 +90,25 @@ async def test_sessions_do_not_share_conversation_history(repository_root: Path)
 
     assert approach.contexts[1].recent_messages == ()
     assert approach.contexts[1].resolved_entities == ()
+
+
+@pytest.mark.asyncio
+async def test_application_service_enforces_workflow_timeout(repository_root: Path) -> None:
+    config_path = repository_root / "config" / "default.yaml"
+    config = load_config(config_path, default_path=config_path, environment={})
+    config = config.model_copy(
+        update={
+            "orchestration": config.orchestration.model_copy(
+                update={"timeout_seconds": 0.01}
+            )
+        }
+    )
+    service = ApplicationService(
+        config,
+        approach_factory=RecordingApproachFactory(SlowApproach()),
+    )
+
+    result = await service.ask("take too long")
+
+    assert not result.succeeded
+    assert result.error == "request timed out after 0.01 seconds"

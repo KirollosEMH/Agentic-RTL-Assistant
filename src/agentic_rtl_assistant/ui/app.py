@@ -3,14 +3,59 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Button, DirectoryTree, Footer, Header, Input, Label, RichLog
+from textual.screen import ModalScreen
+from textual.widgets import (
+    Button,
+    DirectoryTree,
+    Footer,
+    Header,
+    Input,
+    Label,
+    RichLog,
+    Static,
+)
+from textual.worker import Worker
 
 from agentic_rtl_assistant.app.service import ApplicationService
 from agentic_rtl_assistant.config.models import AppConfig
 from agentic_rtl_assistant.config.validation import validate_runtime_paths
+from agentic_rtl_assistant.rtl.tools import WriteRequest
 from agentic_rtl_assistant.telemetry.traces import ExecutionTrace
+
+
+class WriteConfirmationScreen(ModalScreen[bool]):
+    CSS = """
+    WriteConfirmationScreen { align: center middle; }
+    #write-dialog {
+        width: 80%; height: 80%; padding: 1 2;
+        border: thick $warning; background: $surface;
+    }
+    #write-title { height: 2; text-style: bold; }
+    #write-target { height: 2; color: $text-muted; }
+    #write-preview { height: 1fr; border: round $secondary; padding: 1; overflow-y: auto; }
+    #write-actions { height: 3; align: center middle; }
+    #approve-write { margin-right: 2; }
+    """
+
+    def __init__(self, request: WriteRequest) -> None:
+        super().__init__()
+        self.request = request
+
+    def compose(self) -> ComposeResult:
+        operation = "Replace" if self.request.overwrite else "Create"
+        with Vertical(id="write-dialog"):
+            yield Label("Approve RTL file write?", id="write-title")
+            yield Label(f"{operation}: {self.request.path}", id="write-target")
+            yield Static(self.request.content, id="write-preview", markup=False)
+            with Horizontal(id="write-actions"):
+                yield Button("Approve", id="approve-write", variant="success")
+                yield Button("Cancel", id="cancel-write", variant="error")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(event.button.id == "approve-write")
 
 
 class RTLAssistantTUI(App[None]):
@@ -45,6 +90,7 @@ class RTLAssistantTUI(App[None]):
         self.config = config
         self.service: ApplicationService | None = None
         self.session_id: str | None = None
+        self._request_worker: Worker[None] | None = None
         self._service_factory = service_factory
 
     def compose(self) -> ComposeResult:
@@ -148,6 +194,58 @@ class RTLAssistantTUI(App[None]):
             f"{event.event_type.value}: {event.component}"
         )
 
+    def _set_request_controls_disabled(self, disabled: bool) -> None:
+        self.query_one("#question", Input).disabled = disabled
+        self.query_one("#new-session", Button).disabled = disabled
+        self.query_one("#choose-project", Button).disabled = disabled
+
+    async def _confirm_write(self, request: WriteRequest) -> bool:
+        return bool(await self.push_screen_wait(WriteConfirmationScreen(request)))
+
+    @work(
+        name="assistant-request",
+        group="assistant-requests",
+        exclusive=True,
+        exit_on_error=False,
+    )
+    async def _run_request(
+        self,
+        question: str,
+        service: ApplicationService,
+        session_id: str | None,
+    ) -> None:
+        chat = self.query_one("#chat", RichLog)
+        try:
+            result = await service.ask(
+                question,
+                session_id=session_id,
+                write_confirmation=self._confirm_write,
+            )
+            if result.error:
+                chat.write(f"[bold red]Error:[/] {result.error}")
+            elif result.generated_code:
+                chat.write(f"[bold green]Assistant:[/]\n{result.generated_code}")
+            else:
+                chat.write(f"[bold green]Assistant:[/] {result.answer}")
+            for path in result.written_files:
+                chat.write(f"[bold green]Saved:[/] {path}")
+            if result.write_error:
+                chat.write(f"[bold yellow]Write failed:[/] {result.write_error}")
+            cached = result.usage.cached_input_tokens
+            self.query_one("#execution", RichLog).write(
+                f"tokens in={result.usage.input_tokens} cached={cached} "
+                f"out={result.usage.output_tokens} calls={result.usage.llm_calls}"
+            )
+        except Exception as exc:
+            chat.write(f"[bold red]Error:[/] {type(exc).__name__}: {exc}")
+        finally:
+            if self.is_running:
+                if isinstance(self.screen, WriteConfirmationScreen):
+                    self.screen.dismiss(False)
+                self._set_request_controls_disabled(False)
+                question_input = self.query_one("#question", Input)
+                question_input.focus()
+
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "project-path":
             self._open_project(event.value)
@@ -159,20 +257,9 @@ class RTLAssistantTUI(App[None]):
         if not question:
             return
         event.input.value = ""
-        event.input.disabled = True
+        self._set_request_controls_disabled(True)
         chat = self.query_one("#chat", RichLog)
         chat.write(f"[bold cyan]You:[/] {question}")
-        result = await self.service.ask(question, session_id=self.session_id)
-        if result.error:
-            chat.write(f"[bold red]Error:[/] {result.error}")
-        elif result.generated_code:
-            chat.write(f"[bold green]Assistant:[/]\n{result.generated_code}")
-        else:
-            chat.write(f"[bold green]Assistant:[/] {result.answer}")
-        cached = result.usage.cached_input_tokens
-        self.query_one("#execution", RichLog).write(
-            f"tokens in={result.usage.input_tokens} cached={cached} "
-            f"out={result.usage.output_tokens} calls={result.usage.llm_calls}"
+        self._request_worker = self._run_request(
+            question, self.service, self.session_id
         )
-        event.input.disabled = False
-        event.input.focus()

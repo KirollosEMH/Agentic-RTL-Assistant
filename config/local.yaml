@@ -22,9 +22,9 @@ models:
       retries: 1
 
   providers:
-    # ollama:
-    #   base_url: https://ollama.com/v1/
-    #   api_key_env: OLLAMA_API_KEY
-    openrouter:
-      base_url: https://openrouter.ai/api/v1
-      api_key_env: OPENROUTER_API_KEY
+    ollama:
+      base_url: https://ollama.com/v1/
+      api_key_env: OLLAMA_API_KEY
+    # openrouter:
+    #   base_url: https://openrouter.ai/api/v1
+    #   api_key_env: OPENROUTER_API_KEY

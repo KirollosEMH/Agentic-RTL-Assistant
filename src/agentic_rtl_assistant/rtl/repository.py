@@ -30,6 +30,7 @@ class RTLRepository:
         extensions: tuple[str, ...] = (".v", ".sv"),
         ignored_paths: tuple[str, ...] = (".git", ".venv", "build"),
         allow_reads: bool = True,
+        allow_writes: bool = False,
     ) -> None:
         self.root = root.resolve()
         if not self.root.is_dir():
@@ -37,6 +38,7 @@ class RTLRepository:
         self.extensions = tuple(ext.lower() for ext in extensions)
         self.ignored_paths = frozenset(ignored_paths)
         self.allow_reads = allow_reads
+        self.allow_writes = allow_writes
 
     def resolve(self, path: str | Path) -> Path:
         candidate = Path(path)
@@ -52,6 +54,31 @@ class RTLRepository:
     def _require_reads(self) -> None:
         if not self.allow_reads:
             raise RTLRepositoryError("source reads are disabled by configuration")
+
+    def _require_writes(self) -> None:
+        if not self.allow_writes:
+            raise RTLRepositoryError("source writes are disabled by configuration")
+
+    def validate_write_target(
+        self, path: str | Path, *, overwrite: bool = False
+    ) -> Path:
+        self._require_writes()
+        resolved = self.resolve(path)
+        if resolved.suffix.lower() not in self.extensions:
+            allowed = ", ".join(self.extensions)
+            raise RTLRepositoryError(f"write target must use an RTL extension: {allowed}")
+        if resolved.exists():
+            if not resolved.is_file():
+                raise RTLRepositoryError(f"write target is not a file: {resolved}")
+            if not overwrite:
+                raise RTLRepositoryError(
+                    f"source file already exists; overwrite approval is required: {resolved}"
+                )
+        elif not resolved.parent.is_dir():
+            raise RTLRepositoryError(
+                f"write target parent directory does not exist: {resolved.parent}"
+            )
+        return resolved
 
     def list_verilog_files(self) -> tuple[Path, ...]:
         self._require_reads()
@@ -71,6 +98,19 @@ class RTLRepository:
         if not resolved.is_file():
             raise RTLRepositoryError(f"source file does not exist: {resolved}")
         return resolved.read_text(encoding="utf-8")
+
+    def write_source(
+        self,
+        path: str | Path,
+        source: str,
+        *,
+        overwrite: bool = False,
+    ) -> Path:
+        resolved = self.validate_write_target(path, overwrite=overwrite)
+        mode = "w" if overwrite else "x"
+        with resolved.open(mode, encoding="utf-8", newline="\n") as handle:
+            handle.write(source)
+        return resolved
 
     def read_lines(self, path: str | Path, start_line: int, end_line: int) -> str:
         if start_line < 1 or end_line < start_line:

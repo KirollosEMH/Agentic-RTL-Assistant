@@ -132,6 +132,8 @@ class EvaluationRunner:
             "success": result.succeeded if result is not None else False,
             "answer": result.answer if result is not None else None,
             "generated_code": result.generated_code if result is not None else None,
+            "written_files": list(result.written_files) if result is not None else [],
+            "write_error": result.write_error if result is not None else None,
             "usage": {
                 "input_tokens": result.usage.input_tokens if result is not None else 0,
                 "cached_input_tokens": (

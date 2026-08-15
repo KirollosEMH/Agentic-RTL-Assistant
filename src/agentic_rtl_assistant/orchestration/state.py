@@ -6,6 +6,7 @@ from typing import Annotated, TypedDict
 from agentic_rtl_assistant.agents.types import Intent
 from agentic_rtl_assistant.knowledge.evidence import EvidencePack
 from agentic_rtl_assistant.models.types import TokenUsage
+from agentic_rtl_assistant.rtl.tools import WriteConfirmation
 from agentic_rtl_assistant.rtl.types import ValidationResult
 from agentic_rtl_assistant.session.models import ConversationMessage
 from agentic_rtl_assistant.telemetry.traces import ExecutionTrace
@@ -15,6 +16,7 @@ class AgentState(TypedDict, total=False):
     request_id: str
     user_request: str
     session_id: str
+    write_confirmation: WriteConfirmation
     conversation_history: tuple[ConversationMessage, ...]
     resolved_entities: tuple[str, ...]
     intent: Intent
@@ -22,6 +24,9 @@ class AgentState(TypedDict, total=False):
     evidence: EvidencePack
     answer: str
     generated_code: str
+    written_files: list[str]
+    write_status: str
+    write_error: str
     validation_result: ValidationResult
     repair_attempts: int
     usage_events: Annotated[list[TokenUsage], operator.add]

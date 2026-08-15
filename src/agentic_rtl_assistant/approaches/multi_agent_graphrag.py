@@ -45,6 +45,8 @@ class MultiAgentGraphRAGApproach:
         }
         if context.session_id:
             initial["session_id"] = context.session_id
+        if context.write_confirmation is not None:
+            initial["write_confirmation"] = context.write_confirmation
         try:
             state = await self.workflow.ainvoke(
                 initial, config={"recursion_limit": self.max_steps}
@@ -85,6 +87,8 @@ class MultiAgentGraphRAGApproach:
             approach=self.name,
             answer=state.get("answer"),
             generated_code=state.get("generated_code"),
+            written_files=tuple(state.get("written_files", [])),
+            write_error=state.get("write_error"),
             evidence=evidence,
             usage=aggregate_usage(state.get("usage_events", [])),
             timing=TimingMetrics(

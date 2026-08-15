@@ -23,6 +23,7 @@ def test_provider_factory_builds_configured_ollama_provider(repository_root: Pat
 
     assert isinstance(provider, OllamaProvider)
     assert isinstance(provider._client, AsyncOpenAI)
+    assert provider._client.api_key == "test-key"
     assert str(provider._client.base_url) == "https://ollama.com/v1/"
     assert profile.model == "gpt-oss:120b"
 

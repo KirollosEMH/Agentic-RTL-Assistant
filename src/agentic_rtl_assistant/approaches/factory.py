@@ -26,7 +26,12 @@ from agentic_rtl_assistant.knowledge.service import KnowledgeService
 from agentic_rtl_assistant.models.factory import ModelProviderFactory
 from agentic_rtl_assistant.orchestration.graph import build_workflow
 from agentic_rtl_assistant.orchestration.nodes import WorkflowNodes
-from agentic_rtl_assistant.rtl import PyVerilogParser, RTLRepository, RTLValidator
+from agentic_rtl_assistant.rtl import (
+    PyVerilogParser,
+    RTLRepository,
+    RTLValidator,
+    RTLWriteTool,
+)
 from agentic_rtl_assistant.telemetry.collector import TelemetryCollector
 
 
@@ -56,8 +61,15 @@ class ApproachFactory:
             extensions=tuple(config.project.verilog_extensions),
             ignored_paths=tuple(config.project.ignored_paths),
             allow_reads=config.rtl.filesystem.allow_reads,
+            allow_writes=config.rtl.filesystem.allow_writes,
         )
         self.parser = PyVerilogParser(self.repository)
+        self.validator = RTLValidator(self.parser)
+        self.write_tool = RTLWriteTool(
+            self.repository,
+            self.validator,
+            require_confirmation=config.rtl.filesystem.require_confirmation_for_write,
+        )
 
     def create(self, approach_type: ApproachType | None = None) -> AssistantApproach:
         selected = approach_type or self.config.approach.type
@@ -108,6 +120,7 @@ class ApproachFactory:
             max_evidence_items=self.config.context.max_evidence_items,
             max_evidence_tokens=self.config.context.token_budget.max_evidence_tokens,
             max_output_tokens=profile.max_output_tokens,
+            write_tool=self.write_tool,
         )
 
     def _text_retriever(self) -> TextRetriever:
@@ -172,7 +185,8 @@ class ApproachFactory:
             code_agent=code,
             repair_agent=repair,
             retrieval=retrieval,
-            validator=RTLValidator(self.parser),
+            validator=self.validator,
+            write_tool=self.write_tool,
             telemetry=self.telemetry,
         )
         workflow = build_workflow(

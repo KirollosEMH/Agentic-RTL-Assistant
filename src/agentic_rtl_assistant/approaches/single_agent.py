@@ -16,6 +16,7 @@ from agentic_rtl_assistant.knowledge.evidence import (
 from agentic_rtl_assistant.models.base import ModelProvider
 from agentic_rtl_assistant.models.types import ModelMessage, ModelRequest, TokenUsage
 from agentic_rtl_assistant.rtl.repository import RTLRepository, RTLRepositoryError
+from agentic_rtl_assistant.rtl.tools import RTLWriteTool, WriteRequest
 from agentic_rtl_assistant.session.models import as_model_messages
 from agentic_rtl_assistant.telemetry.collector import TelemetryCollector
 from agentic_rtl_assistant.telemetry.timing import TimingMetrics
@@ -27,6 +28,7 @@ from agentic_rtl_assistant.telemetry.traces import EventType, ExecutionTrace
 class ToolResult:
     content: str
     evidence: tuple[SourceEvidence, ...] = ()
+    written_path: str | None = None
 
 
 class SingleAgentApproach:
@@ -46,6 +48,7 @@ class SingleAgentApproach:
         max_evidence_items: int = 12,
         max_evidence_tokens: int = 4000,
         max_output_tokens: int | None = None,
+        write_tool: RTLWriteTool | None = None,
     ) -> None:
         self.provider = provider
         self.repository = repository
@@ -58,6 +61,7 @@ class SingleAgentApproach:
         self.max_evidence_items = max_evidence_items
         self.max_evidence_tokens = max_evidence_tokens
         self.max_output_tokens = max_output_tokens
+        self.write_tool = write_tool
 
     @staticmethod
     def _json_object(content: str) -> dict[str, Any] | None:
@@ -143,7 +147,40 @@ class SingleAgentApproach:
             evidence,
         )
 
-    def _execute_tool(self, name: object, arguments: object) -> ToolResult:
+    async def _write_file(
+        self,
+        arguments: dict[str, Any],
+        context: RunContext,
+    ) -> ToolResult:
+        if self.write_tool is None:
+            raise ValueError("write_file tool is unavailable")
+        path = arguments.get("path")
+        content = arguments.get("content")
+        overwrite = arguments.get("overwrite", False)
+        if not isinstance(path, str) or not path.strip():
+            raise ValueError("path must be a non-empty string")
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("content must be a non-empty string")
+        if not isinstance(overwrite, bool):
+            raise ValueError("overwrite must be a boolean")
+        result = await self.write_tool.execute(
+            WriteRequest(path.strip(), content, overwrite),
+            context.write_confirmation,
+        )
+        return ToolResult(
+            json.dumps(
+                {"written": result.path, "bytes_written": result.bytes_written}
+            ),
+            (),
+            result.path,
+        )
+
+    async def _execute_tool(
+        self,
+        name: object,
+        arguments: object,
+        context: RunContext,
+    ) -> ToolResult:
         if not isinstance(arguments, dict):
             raise ValueError("tool arguments must be a JSON object")
         if name == "list_files":
@@ -152,6 +189,8 @@ class SingleAgentApproach:
             return self._read_file(arguments)
         if name == "search_source":
             return self._search_source(arguments)
+        if name == "write_file":
+            return await self._write_file(arguments, context)
         raise ValueError(f"unknown tool: {name}")
 
     def _accept_evidence(
@@ -203,6 +242,7 @@ class SingleAgentApproach:
         successful_tool_calls = 0
         source_tool_calls = 0
         retrieval_seconds = 0.0
+        written_files: list[str] = []
         final_answer: str | None = None
         error: str | None = None
 
@@ -262,7 +302,9 @@ class SingleAgentApproach:
             traces.append(started_trace)
             result_truncated = False
             try:
-                tool_result = self._execute_tool(tool_name, action.get("arguments", {}))
+                tool_result = await self._execute_tool(
+                    tool_name, action.get("arguments", {}), context
+                )
                 visible_evidence = self._accept_evidence(
                     evidence_items, tool_result.evidence
                 )
@@ -286,6 +328,8 @@ class SingleAgentApproach:
                     successful_tool_calls += 1
                 if tool_error is None and tool_name in {"read_file", "search_source"}:
                     source_tool_calls += 1
+                if tool_result.written_path is not None:
+                    written_files.append(tool_result.written_path)
             except (OSError, RTLRepositoryError, ValueError) as exc:
                 result_content = json.dumps({"error": str(exc)})
                 tool_error = str(exc)
@@ -347,6 +391,7 @@ class SingleAgentApproach:
             request_id=request.request_id,
             approach=self.name,
             answer=final_answer,
+            written_files=tuple(dict.fromkeys(written_files)),
             evidence=evidence,
             usage=aggregate_usage(usages),
             timing=TimingMetrics(
